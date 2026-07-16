@@ -131,6 +131,27 @@ import Testing
     #expect(Date().timeIntervalSince(start) < 2)
 }
 
+@Test func codexRPCClientCancellationBeforeProcessStartDoesNotLaunchIt() async {
+    let client = CodexRPCClient(
+        executable: "/bin/sleep",
+        arguments: ["60"],
+        timeoutSeconds: 60
+    )
+    let start = Date()
+    let task = Task {
+        try await client.fetchSnapshot()
+    }
+
+    task.cancel()
+
+    do {
+        _ = try await task.value
+        Issue.record("Expected the pre-cancelled RPC client task to fail.")
+    } catch {}
+
+    #expect(Date().timeIntervalSince(start) < 2)
+}
+
 @Test func codexRPCClientBrokenStdinFailsWithoutTerminatingHostProcess() async {
     let client = CodexRPCClient(
         executable: "/bin/sh",

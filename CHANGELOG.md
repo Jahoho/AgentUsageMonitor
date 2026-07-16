@@ -28,6 +28,7 @@ Notable user-visible changes are documented here. The project follows semantic v
 - DeepSeek proxy origin validation, bounded request parsing, pinned HTTPS upstream, redirect refusal and loopback-only binding.
 - Credential transaction rollback and defensive provider-error redaction.
 - Bounded Codex RPC line parsing, cancellation and child-process termination.
+- Dispatch-backed provider deadlines and cancellation-safe Codex RPC startup.
 
 ### Known Limitations
 

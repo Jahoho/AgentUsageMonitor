@@ -161,7 +161,7 @@ import Testing
     )
 
     let firstSnapshot = await adapter.snapshot()
-    try? await Task.sleep(for: .milliseconds(120))
+    try? await Task.sleep(for: .milliseconds(300))
     let warmedSnapshot = await adapter.snapshot()
 
     #expect(firstSnapshot.health == .ready)
@@ -425,8 +425,7 @@ private struct BlockingCodexUsageLogReader: CodexUsageLogReading {
     var events: [UsageEvent] = []
 
     func loadEvents() -> [UsageEvent] {
-        let deadline = Date().addingTimeInterval(blockSeconds)
-        while Date() < deadline {}
+        Thread.sleep(forTimeInterval: blockSeconds)
         return events
     }
 }
@@ -472,8 +471,7 @@ private final class DelayedAfterFirstCodexUsageLogReader: CodexUsageLogReading, 
         lock.unlock()
 
         if shouldDelay {
-            let deadline = Date().addingTimeInterval(delaySeconds)
-            while Date() < deadline {}
+            Thread.sleep(forTimeInterval: delaySeconds)
         }
         return events
     }

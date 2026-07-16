@@ -24,6 +24,16 @@ import Testing
     #expect(diagnostic?.attemptedAt == diagnostic?.lastFailureAt)
 }
 
+@Test func providerMonitorDefaultBudgetCoversCodexOfficialAndObservedWork() {
+    let codexBudget = CodexProviderAdapter.defaultOfficialSourceTimeoutSeconds
+        + max(
+            CodexProviderAdapter.defaultLocalActivityTimeoutSeconds,
+            CodexProviderAdapter.defaultOfficialFailureLocalActivityTimeoutSeconds
+        )
+
+    #expect(ProviderMonitorService.defaultTimeoutSeconds > codexBudget)
+}
+
 @Test func providerMonitorServiceTimesOutBlockingAdapterWithoutWaitingForIt() async {
     let adapter = BlockingProviderAdapter(
         providerID: "blocked",
@@ -491,10 +501,13 @@ private struct BlockingProviderAdapter: ProviderSnapshotAdapter {
     }
 
     func snapshot() async -> ProviderSnapshot {
-        let deadline = Date().addingTimeInterval(blockSeconds)
-        while Date() < deadline {}
+        performBlockingWork(for: blockSeconds)
         return testSnapshot(id: providerID, name: providerName)
     }
+}
+
+private func performBlockingWork(for duration: TimeInterval) {
+    Thread.sleep(forTimeInterval: duration)
 }
 
 private struct GatedProviderAdapter: ProviderSnapshotAdapter {

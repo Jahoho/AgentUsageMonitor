@@ -2,12 +2,14 @@ import AgentUsageCore
 import Foundation
 
 struct ProviderMonitorService {
+    static let defaultTimeoutSeconds: TimeInterval = 25
+
     private let adapters: [any ProviderSnapshotAdapter]
     private let providerTimeoutSeconds: TimeInterval
 
     init(
         adapters: [any ProviderSnapshotAdapter] = ProviderRegistry.liveAdapters(),
-        providerTimeoutSeconds: TimeInterval = 15
+        providerTimeoutSeconds: TimeInterval = Self.defaultTimeoutSeconds
     ) {
         self.adapters = adapters
         self.providerTimeoutSeconds = providerTimeoutSeconds
@@ -48,8 +50,7 @@ struct ProviderMonitorService {
                 raceBox.resumeOnce(continuation, returning: snapshot, winner: .adapter)
             }
 
-            let timeoutTask = Task.detached(priority: .userInitiated) {
-                try? await Task.sleep(for: .seconds(timeoutSeconds))
+            let timeoutWorkItem = DispatchWorkItem {
                 raceBox.resumeOnce(
                     continuation,
                     returning: timeoutSnapshot(for: adapter),
@@ -57,7 +58,11 @@ struct ProviderMonitorService {
                 )
             }
 
-            raceBox.setTasks(adapterTask: adapterTask, timeoutTask: timeoutTask)
+            raceBox.setTasks(adapterTask: adapterTask, timeoutWorkItem: timeoutWorkItem)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(
+                deadline: .now() + timeoutSeconds,
+                execute: timeoutWorkItem
+            )
         }
     }
 
@@ -107,18 +112,27 @@ private final class ProviderSnapshotRaceBox: @unchecked Sendable {
     private let lock = NSLock()
     private var winner: Winner?
     private var adapterTask: Task<Void, Never>?
-    private var timeoutTask: Task<Void, Never>?
+    private var timeoutWorkItem: DispatchWorkItem?
 
-    func setTasks(adapterTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
-        let taskToCancel: Task<Void, Never>?
+    func setTasks(adapterTask: Task<Void, Never>, timeoutWorkItem: DispatchWorkItem) {
+        let existingWinner: Winner?
 
         lock.lock()
-        self.adapterTask = adapterTask
-        self.timeoutTask = timeoutTask
-        taskToCancel = taskToCancelAfterLock()
+        existingWinner = winner
+        if existingWinner == nil {
+            self.adapterTask = adapterTask
+            self.timeoutWorkItem = timeoutWorkItem
+        }
         lock.unlock()
 
-        taskToCancel?.cancel()
+        switch existingWinner {
+        case .adapter:
+            timeoutWorkItem.cancel()
+        case .timeout:
+            adapterTask.cancel()
+        case nil:
+            break
+        }
     }
 
     func resumeOnce(
@@ -126,7 +140,8 @@ private final class ProviderSnapshotRaceBox: @unchecked Sendable {
         returning snapshot: ProviderSnapshot,
         winner: Winner
     ) {
-        let taskToCancel: Task<Void, Never>?
+        let adapterTaskToCancel: Task<Void, Never>?
+        let timeoutWorkItemToCancel: DispatchWorkItem?
 
         lock.lock()
         guard self.winner == nil else {
@@ -135,21 +150,20 @@ private final class ProviderSnapshotRaceBox: @unchecked Sendable {
         }
 
         self.winner = winner
-        taskToCancel = taskToCancelAfterLock()
-        lock.unlock()
-
-        taskToCancel?.cancel()
-        continuation.resume(returning: snapshot)
-    }
-
-    private func taskToCancelAfterLock() -> Task<Void, Never>? {
         switch winner {
         case .adapter:
-            return timeoutTask
+            adapterTaskToCancel = nil
+            timeoutWorkItemToCancel = timeoutWorkItem
         case .timeout:
-            return adapterTask
-        case nil:
-            return nil
+            adapterTaskToCancel = adapterTask
+            timeoutWorkItemToCancel = nil
         }
+        adapterTask = nil
+        timeoutWorkItem = nil
+        lock.unlock()
+
+        adapterTaskToCancel?.cancel()
+        timeoutWorkItemToCancel?.cancel()
+        continuation.resume(returning: snapshot)
     }
 }

@@ -30,6 +30,7 @@
 - Menu bar status uses Codex `codex-session` for compact Codex quota instead of falling through to weekly quota.
 - Provider refresh timeouts return provider-scoped error snapshots instead of blocking the monitor.
 - Provider refresh timeouts return promptly even when an adapter is stuck in non-cooperative synchronous work.
+- The default provider deadline exceeds the complete Codex official-source and local-enrichment budgets.
 - Provider refreshes start concurrently and preserve configured provider order in the returned snapshot list.
 - Live provider registration has unique ordered ids and drives adapter creation, navigation titles/icons, timeout identity, and per-provider freshness policy from one metadata source.
 - Dashboard navigation wraps registered providers between the fixed Overview and Settings destinations without a provider-id icon switch.
@@ -61,6 +62,7 @@
 - Codex local log reader migrates v1 parsed caches in place and removes already-cached dense replay bursts without forcing a full unchanged-history rebuild.
 - Codex local log reader retries transient file-read failures, preserves cached entries only below an incomplete scan path, and still prunes known deletions elsewhere instead of restoring the whole previous index.
 - Codex RPC cancellation terminates a blocking child process instead of waiting for the full process timeout.
+- A Codex RPC task cancelled before its child process starts never launches a stranded process.
 - Codex RPC timeout escalates from SIGTERM to SIGKILL when a child explicitly ignores termination.
 - Codex RPC writes fail as provider-scoped errors when app-server closes stdin, without delivering `SIGPIPE` to the menu bar app.
 - Codex RPC line reading preserves multiple buffered responses, joins chunked lines, rejects partial EOF payloads, and caps each response line at 1 MiB.

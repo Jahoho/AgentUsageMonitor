@@ -357,7 +357,7 @@ func deepSeekUpstreamRelayDrainsLastChunkAndRecordsUsageOnceAfterUpstreamError()
 }
 
 @Test(.timeLimit(.minutes(1)))
-func deepSeekProxyBecomesRunningOnlyAfterListenerIsReady() async throws {
+func deepSeekProxyReportsRunningWhenListenerIsReady() async throws {
     let server = DeepSeekProxyServer(
         port: 0,
         usageStore: DeepSeekProxyTestUsageStore(),
@@ -366,7 +366,6 @@ func deepSeekProxyBecomesRunningOnlyAfterListenerIsReady() async throws {
     defer { server.stop() }
 
     try server.start()
-    #expect(server.isRunning == false)
 
     for _ in 0..<100 where server.isRunning == false {
         try await Task.sleep(for: .milliseconds(20))

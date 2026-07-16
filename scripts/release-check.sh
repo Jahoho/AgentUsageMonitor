@@ -12,7 +12,7 @@ else
     echo "Source archive detected; skipping Git repository checks."
 fi
 
-swift test
+swift test --no-parallel
 "$ROOT_DIR/scripts/package-app.sh"
 "$ROOT_DIR/scripts/verify-package.sh"
 

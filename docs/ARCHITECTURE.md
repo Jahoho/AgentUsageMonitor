@@ -214,7 +214,7 @@ The app also runs a background refresh loop for the menu bar status light. The l
 
 DeepSeek credential metadata and local proxy lifecycle are configured at launch and when settings change, not after every provider refresh. This keeps routine dashboard publication free of synchronous Keychain/proxy work on the main actor; provider adapters continue reading required secrets only from their background refresh tasks.
 
-Each provider refresh has a hard timeout. If one provider hangs or enters non-cooperative synchronous work, the app returns an error snapshot for that provider and continues refreshing the others instead of leaving the dashboard stuck in a refreshing state.
+Each provider refresh has a 25-second hard timeout, leaving enough room for Codex's bounded 20-second official-source race and one-second local enrichment. The deadline uses a dispatch timer so non-cooperative synchronous work cannot occupy the same cooperative executor that must deliver the timeout. If one provider hangs, the app returns an error snapshot for that provider and continues refreshing the others instead of leaving the dashboard stuck in a refreshing state.
 
 The packaged app can register itself as a macOS login item from Settings -> App. Source builds may report that login startup is available only after packaging because `SMAppService` expects a real `.app` bundle.
 

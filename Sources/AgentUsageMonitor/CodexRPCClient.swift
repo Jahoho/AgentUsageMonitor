@@ -59,6 +59,8 @@ private final class CodexRPCSession: @unchecked Sendable {
     private let arguments: [String]
     private let lock = NSLock()
     private var process: Process?
+    private var shutdownRequested = false
+    private var terminationStarted = false
 
     init(environment: [String: String], executable: String, arguments: [String]) {
         self.environment = environment
@@ -87,17 +89,32 @@ private final class CodexRPCSession: @unchecked Sendable {
         }
 
         lock.lock()
+        guard shutdownRequested == false else {
+            lock.unlock()
+            throw CancellationError()
+        }
         self.process = process
         lock.unlock()
 
+        defer {
+            shutdown()
+        }
+
         do {
+            try Task.checkCancellation()
             try process.run()
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
+            if isShutdownRequested {
+                throw CancellationError()
+            }
             throw CodexRPCError.startFailed(error.localizedDescription)
         }
 
-        defer {
+        if isShutdownRequested || Task.isCancelled {
             shutdown()
+            throw CancellationError()
         }
         let responseReader = CodexRPCLineReader(handle: stdoutPipe.fileHandleForReading)
 
@@ -176,25 +193,38 @@ private final class CodexRPCSession: @unchecked Sendable {
     }
 
     func shutdown() {
+        let processToTerminate: Process?
+
         lock.lock()
-        let process = self.process
-        self.process = nil
+        shutdownRequested = true
+        if terminationStarted == false, let process, process.isRunning {
+            terminationStarted = true
+            processToTerminate = process
+        } else {
+            processToTerminate = nil
+        }
         lock.unlock()
 
-        guard let process, process.isRunning else {
+        guard let processToTerminate else {
             return
         }
 
-        process.terminate()
+        processToTerminate.terminate()
         let deadline = ProcessInfo.processInfo.systemUptime + 0.1
-        while process.isRunning,
+        while processToTerminate.isRunning,
               ProcessInfo.processInfo.systemUptime < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
 
-        if process.isRunning {
-            Darwin.kill(process.processIdentifier, SIGKILL)
+        if processToTerminate.isRunning {
+            Darwin.kill(processToTerminate.processIdentifier, SIGKILL)
         }
+    }
+
+    private var isShutdownRequested: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return shutdownRequested
     }
 }
 

@@ -186,14 +186,17 @@ struct CodexProviderAdapter: ProviderSnapshotAdapter, @unchecked Sendable {
                 raceBox.resumeOnce(continuation, returning: enriched, winner: .enrichment)
             }
 
-            let timeoutTask = Task.detached(priority: .utility) {
-                try? await Task.sleep(for: .seconds(remainingTimeoutSeconds))
+            let timeoutWorkItem = DispatchWorkItem {
                 let fallback = localActivityCache.latestPayload()?.applying(to: timeoutFallback)
                     ?? timeoutFallback
                 raceBox.resumeOnce(continuation, returning: fallback, winner: .timeout)
             }
 
-            raceBox.setTasks(enrichmentTask: enrichmentTask, timeoutTask: timeoutTask)
+            raceBox.setTasks(enrichmentTask: enrichmentTask, timeoutWorkItem: timeoutWorkItem)
+            DispatchQueue.global(qos: .utility).asyncAfter(
+                deadline: .now() + remainingTimeoutSeconds,
+                execute: timeoutWorkItem
+            )
         }
     }
 
@@ -517,18 +520,27 @@ private final class CodexEnrichmentRaceBox: @unchecked Sendable {
     private let lock = NSLock()
     private var winner: Winner?
     private var enrichmentTask: Task<Void, Never>?
-    private var timeoutTask: Task<Void, Never>?
+    private var timeoutWorkItem: DispatchWorkItem?
 
-    func setTasks(enrichmentTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
-        let taskToCancel: Task<Void, Never>?
+    func setTasks(enrichmentTask: Task<Void, Never>, timeoutWorkItem: DispatchWorkItem) {
+        let existingWinner: Winner?
 
         lock.lock()
-        self.enrichmentTask = enrichmentTask
-        self.timeoutTask = timeoutTask
-        taskToCancel = taskToCancelAfterLock()
+        existingWinner = winner
+        if existingWinner == nil {
+            self.enrichmentTask = enrichmentTask
+            self.timeoutWorkItem = timeoutWorkItem
+        }
         lock.unlock()
 
-        taskToCancel?.cancel()
+        switch existingWinner {
+        case .enrichment:
+            timeoutWorkItem.cancel()
+        case .timeout:
+            break
+        case nil:
+            break
+        }
     }
 
     func resumeOnce(
@@ -536,7 +548,8 @@ private final class CodexEnrichmentRaceBox: @unchecked Sendable {
         returning snapshot: ProviderSnapshot,
         winner: Winner
     ) {
-        let taskToCancel: Task<Void, Never>?
+        let enrichmentTaskToCancel: Task<Void, Never>?
+        let timeoutWorkItemToCancel: DispatchWorkItem?
 
         lock.lock()
         guard self.winner == nil else {
@@ -545,21 +558,20 @@ private final class CodexEnrichmentRaceBox: @unchecked Sendable {
         }
 
         self.winner = winner
-        taskToCancel = taskToCancelAfterLock()
-        lock.unlock()
-
-        taskToCancel?.cancel()
-        continuation.resume(returning: snapshot)
-    }
-
-    private func taskToCancelAfterLock() -> Task<Void, Never>? {
         switch winner {
         case .enrichment:
-            return timeoutTask
+            enrichmentTaskToCancel = nil
+            timeoutWorkItemToCancel = timeoutWorkItem
         case .timeout:
-            return enrichmentTask
-        case nil:
-            return nil
+            enrichmentTaskToCancel = nil
+            timeoutWorkItemToCancel = nil
         }
+        enrichmentTask = nil
+        timeoutWorkItem = nil
+        lock.unlock()
+
+        enrichmentTaskToCancel?.cancel()
+        timeoutWorkItemToCancel?.cancel()
+        continuation.resume(returning: snapshot)
     }
 }
