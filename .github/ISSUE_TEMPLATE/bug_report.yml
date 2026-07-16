@@ -1,0 +1,99 @@
+name: Bug report
+description: Report reproducible incorrect behavior without sharing credentials or private provider data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a problem. Search existing issues first and never attach API keys, auth files, session logs, cookies, or unredacted provider responses.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Use the app version or `git rev-parse --short HEAD`.
+      placeholder: v0.1.0 or abc1234
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Hardware architecture
+      options:
+        - Apple Silicon
+        - Intel
+        - Unknown
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - swift run
+        - Local packaged app
+        - Other source build
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: providers
+    attributes:
+      label: Affected providers
+      options:
+        - label: Codex
+        - label: Claude
+        - label: DeepSeek
+        - label: OpenRouter
+        - label: App shell, settings, or menu bar
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the visible behavior and why it appears incorrect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Refresh ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Include source status and error text only after removing account data and local usernames.
+      render: text
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I removed API keys, tokens, cookies, authorization headers, emails, account ids, usernames, auth files, and session content.
+          required: true

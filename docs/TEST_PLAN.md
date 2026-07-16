@@ -1,0 +1,185 @@
+# Test Plan
+
+## Automated
+
+- Provider snapshots preserve confidence labels.
+- DeepSeek balance JSON parses into account metrics.
+- DeepSeek multi-key balance snapshots report configured and available keys.
+- DeepSeek usage JSON parses into observed usage events.
+- DeepSeek streaming SSE usage chunks parse into observed usage events.
+- DeepSeek usage events can carry a configured account id.
+- DeepSeek cost cards calculate from observed token events.
+- DeepSeek cost cards accept only explicitly supported official model prices and complete token/cache splits; unknown or mixed windows remain unavailable instead of receiving a guessed default price.
+- DeepSeek observed usage events group into hourly activity buckets.
+- DeepSeek account profiles map events only to their exact `accountID`, retain unmatched events as unattributed, and aggregate model rows without inventing spend.
+- DeepSeek per-key official balance requests start concurrently and isolate failures.
+- DeepSeek HTTP balance errors include provider response messages without leaking API keys.
+- DeepSeek proxy request parsing covers GET without Content-Length, POST body completion, unsupported transfer encoding, strict origin-form targets, request method/version validation, invalid header names/values, duplicate singleton headers, 64 KiB header limits, 32 MiB body limits, and overflow-sized Content-Length values.
+- DeepSeek upstream URL construction stays on `https://api.deepseek.com`, rejects authority-changing targets, and never follows redirects.
+- DeepSeek upstream request and response policies remove fixed hop-by-hop fields plus case-insensitive fields named by `Connection`, while preserving official end-to-end headers.
+- DeepSeek response relaying forwards SSE chunks before upstream completion, preserves write order under asynchronous completions, waits for the last accepted write before closing, and records usage at most once.
+- DeepSeek upstream lifecycle rejects task creation after invalidation, and proxy stop/start cannot reuse an invalidated URLSession.
+- DeepSeek upstream errors send one 502 only before a response head starts; errors after the official head close the existing response without inserting another status line.
+- DeepSeek listener parameters require IPv4 loopback, and running state becomes true only after a real listener reaches ready.
+- DeepSeek proxy stop/start recreates its ephemeral upstream URLSession instead of retaining stopped-session tasks.
+- DeepSeek request timeout state sends at most one timeout, cancels the short header deadline once complete headers arrive, and keeps a full-request deadline for slow bodies.
+- DeepSeek usage event storage appends JSONL and migrates legacy JSON arrays without deleting them.
+- Compact token values format consistently across provider cards.
+- Menu bar status chooses current-hour activity before low quota, errors, and stale activity.
+- Menu bar status chooses the current-hour active provider before stale provider errors.
+- Menu bar status uses Codex `codex-session` for compact Codex quota instead of falling through to weekly quota.
+- Provider refresh timeouts return provider-scoped error snapshots instead of blocking the monitor.
+- Provider refresh timeouts return promptly even when an adapter is stuck in non-cooperative synchronous work.
+- Provider refreshes start concurrently and preserve configured provider order in the returned snapshot list.
+- Live provider registration has unique ordered ids and drives adapter creation, navigation titles/icons, timeout identity, and per-provider freshness policy from one metadata source.
+- Dashboard navigation wraps registered providers between the fixed Overview and Settings destinations without a provider-id icon switch.
+- Dashboard refreshes do not preserve a previous Codex snapshot when current official Codex refresh fails.
+- Source diagnostics preserve recent in-memory success/failure times, mark permitted last-known fallback data, and never mark Codex or OpenRouter errors as fallback.
+- OpenRouter official key JSON decodes daily, weekly, monthly, all-time, BYOK, limit, and credential-type fields without defaulting missing usage windows to zero.
+- OpenRouter standard keys call only `/api/v1/key`; management keys may additionally call `/api/v1/credits`, paginated `/api/v1/keys`, and hash-filtered `/api/v1/activity`.
+- OpenRouter management credit failures preserve valid current official key usage and add a diagnostic note.
+- OpenRouter managed key names/hashes and activity fields decode strictly, aggregate prompt plus completion tokens without double-counting reasoning tokens, and keep per-model spend Official.
+- OpenRouter spend, account credit totals, key-limit bars, returned daily buckets, and model rows map directly from official fields with no synthetic dates or values.
+- OpenRouter credentials support multiple labeled/default Keychain entries, migrate the legacy single-key item, and redact every active key from provider errors.
+- OpenRouter provider refresh isolates a single current-key, Keychain-read, catalog, or activity failure without discarding other valid official accounts.
+- The accessory app installs standard responder-chain Edit commands so `Command-V` reaches OpenRouter and DeepSeek secure text fields.
+- Dashboard refreshes do not preserve a previous OpenRouter snapshot when current official OpenRouter refresh fails.
+- Codex OAuth/RPC rate limit snapshots map into official provider bars.
+- Codex adapter returns an error when OAuth/RPC sources exceed the adapter-level official sync timeout.
+- Codex adapter retries a transient official transport failure once inside the same bounded refresh, has enough default budget for two complete source attempts, and records when that retry recovered current official data.
+- Codex adapter does not use stored snapshots when current official sources fail.
+- Codex adapter attaches local token activity as Observed metrics when official sources fail or succeed, without adding quota bars on official failure.
+- Codex adapter returns current official quota/error snapshots without waiting for slow local activity enrichment.
+- Codex adapter timeout fallbacks keep Observed token metric slots and activity buckets visible as unavailable instead of dropping the token/activity sections.
+- Codex local activity scans start only after the official source race completes, and a slow scan cannot turn an already-valid official quota result into an outer provider timeout.
+- An exceptional outer Codex provider timeout keeps health in error, preserves no quota bars/reset credits, and may retain only the last completed explicitly Observed token/activity payload.
+- Codex official error status is not hidden by local observed Codex activity in the menu bar.
+- Codex official error status is not hidden by local observed Codex activity in the overview active-agent panel.
+- Codex local log reader still supports explicit file/byte budgets for constrained callers and prefers recent files when such a budget is supplied.
+- Codex local log reader has no production file/byte cap, so new logs cannot evict older events that are still inside the rolling 30-day window.
+- Codex local log reader persists parsed files by path, modification time, and byte count, invalidates changed entries, prunes removed files, and rebuilds a corrupted cache.
+- Codex local log reader migrates v1 parsed caches in place and removes already-cached dense replay bursts without forcing a full unchanged-history rebuild.
+- Codex local log reader retries transient file-read failures, preserves cached entries only below an incomplete scan path, and still prunes known deletions elsewhere instead of restoring the whole previous index.
+- Codex RPC cancellation terminates a blocking child process instead of waiting for the full process timeout.
+- Codex RPC timeout escalates from SIGTERM to SIGKILL when a child explicitly ignores termination.
+- Codex RPC writes fail as provider-scoped errors when app-server closes stdin, without delivering `SIGPIPE` to the menu bar app.
+- Codex RPC line reading preserves multiple buffered responses, joins chunked lines, rejects partial EOF payloads, and caps each response line at 1 MiB.
+- Local command probes time out quickly instead of hanging a provider refresh.
+- Codex RPC response parsing reads official `rateLimitResetCredits.availableCount` and optional `credits` expiry details into a reset bank without inventing dates for count-only entries.
+- Codex OAuth refresh concurrently reads the official reset-credit endpoint with account-scoped headers and a bounded timeout.
+- Codex OAuth usage requests bypass local HTTP cache data, and reset-credit failures do not discard otherwise valid official usage windows or an embedded official reset bank.
+- Codex OAuth usage-window parsing is covered in Core for snake_case, camelCase, nested payloads, numeric strings, and Unix second/millisecond timestamps; malformed or windowless payloads fail closed.
+- Codex visible page text parses into official usage bars.
+- Codex usage bars preserve absolute reset timestamps so live official snapshots recompute countdown text instead of freezing old `Resets in ...` strings.
+- Codex official timestamp parsing normalizes Unix seconds and Unix milliseconds for rate-limit reset times and reset-credit expiry times.
+- Codex visible page text and official page metadata parse reset expiry entries only when explicit expiry dates are exposed.
+- Codex local token metrics and activity use reported `total_tokens`, include cached input, show its exact share as supporting text, and remain labeled as Observed telemetry.
+- Observed hourly activity labels use the shared compact token formatter across K, M, and B ranges while preserving their numeric bucket values.
+- Codex token enrichment excludes future-dated events and does not expose a local USD or credit estimate.
+- Codex snapshot enrichment keeps token metric slots and 24 hourly activity buckets even when no local events exist, with unavailable confidence.
+- Codex local token logs carry session model/effort context into usage events, so Top model can show the real model instead of the generic `codex` fallback.
+- Codex local token logs skip duplicate telemetry rows when cumulative `total_token_usage` is unchanged, while preserving cumulative resets as new segments.
+- Codex local token logs deduplicate the same session id across live and archived session directories.
+- Codex local token logs skip dense replay bursts from explicit subagents and ordinary restored sessions with `forked_from_id`, while keeping normal post-fork usage events.
+- Codex local token logs skip sparse fork replay rows when rate-limit reset metadata is stale, while tolerating small clock skew.
+- Codex local token logs parse ISO timestamps with and without fractional seconds.
+- Token and cost `30d` summaries use a rolling 30x24-hour window.
+- Popover sizing keeps sparse pages at a comfortable minimum, uses natural height when content fits, caps long pages at the preferred maximum, and respects smaller screen bounds.
+- Claude adapter reports CLI availability without claiming exact subscription quota.
+- DashboardViewModel refresh state is covered with injected providers.
+- Dashboard refresh does not reload DeepSeek credentials or reconfigure local services after every provider cycle.
+- Codex provider refreshes reuse a recent completed local activity payload while still fetching fresh official quota.
+- A timed-out Codex local activity rescan preserves the latest completed Observed token metrics and activity without preserving stale official quota bars.
+- DeepSeek credential CRUD and legacy key migration are covered with an in-memory secret store.
+- DeepSeek and OpenRouter credential tests cover metadata-write rollback, Keychain-delete rollback, rollback failure visibility, and invalid default ids.
+- App-owned credential metadata, observed-event and parsed-cache files use `0600` permissions inside `0700` directories.
+- Aggregation sums numeric metrics without mixing unavailable values.
+- Empty provider states produce readable unavailable snapshots.
+
+## Package Checks
+
+- Run `./scripts/release-check.sh` for repository security checks, diff validation, all Swift tests, a clean staged release build, and package verification.
+- Confirm the same command succeeds from a GitHub-style source archive without a `.git` directory by skipping only repository-specific checks.
+- Confirm GitHub Actions runs the release gate on both `macos-15` and `macos-15-intel`.
+- Run `./scripts/package-app.sh`.
+- Run `./scripts/verify-package.sh`.
+- Confirm package verification checks `CFBundleIdentifier`, executable name, package type, minimum macOS version, and `LSUIElement` in addition to files/resources.
+- Confirm a sentinel file placed only in the previous Release bundle is absent after packaging, proving stale resources cannot survive a rebuild.
+- Confirm the packaged app contains `AgentUsageMonitor_AgentUsageMonitor.bundle`.
+- Confirm the packaged app contains `Contents/Resources/AgentUsageMonitor.icns`.
+- Confirm `codex.png`, `claude.png`, `deepseek.png`, and `openrouter.svg` exist inside the packaged resource bundle.
+- Quit the running app, run `./scripts/install-app.sh`, then run `./scripts/verify-installation.sh`.
+- Confirm install verification reports byte-identical Release and installed bundles with no historical, staging, or previous app bundle left behind.
+
+## Manual
+
+- Run `swift run AgentUsageMonitor`.
+- Click the menu bar icon.
+- Switch between Overview, Codex, Claude, DeepSeek, OpenRouter, and Settings.
+- Confirm Overview shows Active agent, Today activity, and Sources without horizontal overflow.
+- Confirm Overview Today activity aggregates observed activity across connected providers rather than mirroring a single provider page.
+- Confirm switching back to Overview from provider pages feels immediate after the app has loaded.
+- In the packaged app, toggle `Settings` -> `App` -> `Start at login` and confirm the row reports the current macOS login item state.
+- Confirm provider website entries live under their provider sections in Settings and can open Codex, Claude, DeepSeek, OpenRouter, or the in-app Codex Web Sync window.
+- Confirm the top tabs show bundled brand marks instead of fallback circles.
+- Confirm the Overview tab icon reads as a hub/command mark and matches the selected/unselected tab styling.
+- Confirm the menu bar icon updates after refresh, uses a non-blue quota ring, and has no separate status dot.
+- Confirm the menu bar icon updates from full background refresh and can show Codex as active while Codex is being used.
+- Confirm Codex menu bar quota remains the 5h/session value after session quota refreshes, even when the weekly quota is lower.
+- Confirm Codex, Claude, DeepSeek, and OpenRouter pages shrink to their natural content height without a blank bottom strip.
+- Confirm Overview grows to fit when possible, Settings caps at the screen-safe maximum and scrolls, and expanding provider diagnostics updates the overflow area without resizing beyond the screen.
+- Scroll down in Settings, switch to a provider tab, and confirm the new page starts at the top while later refreshes on the same tab do not unexpectedly reset its scroll position.
+- Confirm tab switching stays responsive while refresh is running.
+- Open the menu bar popover, click controls and switch tabs inside it, and confirm it stays open; then click the desktop or another app and confirm it closes immediately.
+- Leave the app running across at least two 60-second background refresh cycles while actively using Codex, and confirm the popover remains interactive and Quit still responds without repeated local token scans causing a resource spike.
+- Save a DeepSeek API key and refresh.
+- Add multiple DeepSeek API keys under `Settings` -> `DeepSeek`, mark one as default, and delete one.
+- Confirm each DeepSeek key profile shows only requests captured with that matching key; unmatched or deleted-key events stay under `Unattributed requests`.
+- Confirm DeepSeek model rows show exact observed input/output/total tokens and no model spend estimate.
+- Confirm invalid DeepSeek keys show a clear error.
+- Point a non-streaming DeepSeek request at `http://127.0.0.1:18491` and confirm tokens appear after refresh.
+- Point a streaming DeepSeek request with usage reporting enabled at `http://127.0.0.1:18491` and confirm tokens appear after refresh.
+- Confirm the first streaming DeepSeek response chunk reaches the client before the upstream request completes and that the final usage event is recorded only once.
+- Confirm `lsof -nP -iTCP:18491 -sTCP:LISTEN` reports `127.0.0.1:18491`, not `*:18491`.
+- Confirm Settings shows the DeepSeek proxy as starting before listener readiness and reports a concrete failure instead of claiming it is running.
+- Open a TCP connection without completing the request headers and confirm the proxy closes it with HTTP 408 after the header deadline.
+- Confirm DeepSeek activity bars reflect recorded request hours rather than static sample data.
+- Hover across a provider activity chart and confirm the nearest hour stays selected through gaps, the bar darkens, and the compact floating card shows only the hour and abbreviated token count.
+- Confirm Codex hourly activity hover cards abbreviate large token values with `K`, `M`, or `B` rather than rendering long raw integers.
+- Confirm DeepSeek cards show `Balance`, `Today tokens`, `Today cost`, and `30d tokens`.
+- Save a standard OpenRouter API key and confirm the OpenRouter page shows official daily, weekly, monthly, and all-time spend without token/activity sections.
+- Add multiple OpenRouter API keys, change the default display key, delete one, restart the app, and confirm labels/default state persist without exposing secrets outside Keychain.
+- Paste API keys into both OpenRouter and DeepSeek secure fields with `Command-V`, then confirm typing, Select All, Cut, Copy, and Paste remain available while the popover is open.
+- Confirm a configured OpenRouter key limit maps to the remaining quota bar and the daily/weekly/monthly reset label matches the official response.
+- With a management key, confirm account credit balance and totals appear; with a standard key, confirm the provider remains Ready without management credit cards.
+- With a management key, confirm the key picker uses official `/keys` names and each discovered key shows only its hash-filtered official model activity for returned completed UTC dates.
+- Temporarily make one managed-key activity request fail and confirm that key keeps official spend/limits while activity reports unavailable; other key activity remains visible.
+- Temporarily invalidate the OpenRouter key after a successful refresh and confirm the page reports the current official error instead of showing the prior values.
+- Confirm Codex reads usage automatically when `~/.codex/auth.json` or the Codex CLI RPC source is available.
+- Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
+- Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.
+- Confirm Codex `Today local tokens`, `30d local tokens`, `Latest local tokens`, `Top local model`, and hourly activity use reported `total_tokens`; each token card shows one total and a cached-input percentage, with no local USD or credit estimate.
+- Confirm after a cold launch with large Codex logs, the first refresh may show unavailable Observed token slots while the background local log scan warms the parser cache, and a later refresh shows actual Observed token/activity values.
+- Confirm Codex `Top model` reflects the real model/effort from local session logs when present.
+- Confirm a future-dated Codex log event does not inflate today, 30-day, latest, top-model, or activity values.
+- Confirm enriching Observed token/activity data leaves current official Codex quota bars unchanged.
+- Confirm Codex reset bank shows the official available count and the compact reset line shows the earliest explicit expiry returned by the OAuth reset-credit endpoint or CLI RPC details. If neither official source returns expiry details, confirm the UI keeps `expiry not exposed` and does not infer a date.
+- Confirm Codex separates account plan and Codex quota tier when both are available.
+- Confirm quota bars display remaining percentage.
+- Confirm Codex shows safe sync failure notes when OAuth and RPC are unavailable.
+- Switch macOS between light and dark appearance and confirm the popover uses warm light styling in light mode and translucent gray frosted material with light text in dark mode.
+- Switch repeatedly between a short provider page, Overview, and Settings. Confirm the header/top edge stays fixed without a crossfade or white flash, the scroll position resets to the top, and only the lower viewport plus bottom edge follow the short anchored resize.
+- Enable macOS Reduce Motion and confirm popover resizing becomes immediate while content switching, sizing, and scrolling still work.
+- Open `Settings` -> `Provider status` and confirm each source shows its current status and recent success/failure time. When a permitted provider shows last-known data after an error, confirm the source row says `Fallback`; Codex and OpenRouter must show the current error without that fallback.
+- Open `Settings` -> `Codex` -> `Open Codex Web Debug` and confirm it is presented as an immediate official-page troubleshooting tool, does not persist a dashboard quota snapshot, and never acts as a dashboard fallback source.
+- Confirm Claude tab does not claim exact quota when only CLI availability is known.
+- Install with `./scripts/install-app.sh` and confirm `/Applications/AgentUsageMonitor.app` uses the generated app icon.
+- Confirm `./scripts/install-app.sh` replaces old `/Applications` app bundles instead of leaving duplicate Agent Usage Monitor apps.
+- Confirm `./scripts/install-app.sh` refuses to replace a currently running app and restores the previous bundle if staged replacement verification fails.
+
+## Not Yet Covered
+
+- Stable Claude subscription reader.
+- Packaged `.app` signing and notarization.
+- Automated tests for `SMAppService` login item registration; this currently requires packaged-app/manual verification.
+- Guarded live-contract tests against opt-in provider test accounts; normal CI uses synthetic fixtures and local loopback only.

@@ -1,0 +1,15 @@
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+*.xcuserstate
+.DS_Store
+.vscode/
+.env
+local/
+releases/
+Packaging/AppIcon/
+*.log
+*.sqlite
+*.sqlite3

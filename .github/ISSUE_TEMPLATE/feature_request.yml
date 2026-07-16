@@ -1,0 +1,36 @@
+name: Feature request
+description: Propose a focused improvement or a provider with a reliable data source.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow or decision is difficult today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed outcome
+      description: Describe the smallest useful behavior, not only a preferred implementation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Data source and confidence
+      description: For provider requests, link the official API or CLI documentation and state whether the value would be Official, Observed, Estimated, or Unavailable.
+
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and security impact
+      description: Note any new credentials, files, network destinations, local listeners, or stored fields.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

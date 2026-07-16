@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Jahoho/AgentUsageMonitor/security/advisories/new
+    about: Report credential exposure, proxy boundary failures, or other vulnerabilities privately.
+  - name: Configuration and data sources
+    url: https://github.com/Jahoho/AgentUsageMonitor/blob/main/docs/CONFIGURATION.md
+    about: Review provider requirements, confidence labels, and known source limitations before opening an issue.
