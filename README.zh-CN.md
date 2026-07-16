@@ -57,7 +57,7 @@ Agent Usage Monitor 通过紧凑的原生 macOS 界面，集中展示日常 AI �
 ```bash
 git clone https://github.com/Jahoho/AgentUsageMonitor.git
 cd AgentUsageMonitor
-swift test
+swift test --no-parallel
 swift run AgentUsageMonitor
 ```
 

@@ -20,7 +20,7 @@ Clone and verify:
 ```bash
 git clone https://github.com/Jahoho/AgentUsageMonitor.git
 cd AgentUsageMonitor
-swift test
+swift test --no-parallel
 swift run AgentUsageMonitor
 ```
 

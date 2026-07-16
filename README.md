@@ -57,7 +57,7 @@ The local packaging script produces a binary for the architecture of the build m
 ```bash
 git clone https://github.com/Jahoho/AgentUsageMonitor.git
 cd AgentUsageMonitor
-swift test
+swift test --no-parallel
 swift run AgentUsageMonitor
 ```
 

@@ -153,7 +153,7 @@ The app only shows exact quota when a reliable official value is readable. Other
 Run:
 
 ```bash
-swift test
+swift test --no-parallel
 ./scripts/package-app.sh
 ./scripts/verify-package.sh
 ```
