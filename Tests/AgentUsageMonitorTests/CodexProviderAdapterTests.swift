@@ -193,18 +193,20 @@ import Testing
         secondary: nil,
         source: "OAuth API"
     )
+    let usageLogReader = ControlledBlockingCodexUsageLogReader(events: [event])
+    defer { usageLogReader.unblock() }
     let adapter = CodexProviderAdapter(
         commandReader: TestLocalCommandReader(output: "codex 0.1.0"),
-        codexUsageLogReader: BlockingCodexUsageLogReader(blockSeconds: 0.18, events: [event]),
+        codexUsageLogReader: usageLogReader,
         apiClient: DelayedSuccessfulCodexRateLimitClient(
-            delayMilliseconds: 120,
+            delayMilliseconds: 50,
             snapshot: rateLimits
         ),
         rpcClient: FailingCodexRateLimitClient(),
-        officialSourceTimeoutSeconds: 0.5,
+        officialSourceTimeoutSeconds: 1,
         localActivityTimeoutSeconds: 0.02
     )
-    let service = ProviderMonitorService(adapters: [adapter], providerTimeoutSeconds: 0.25)
+    let service = ProviderMonitorService(adapters: [adapter], providerTimeoutSeconds: 0.5)
 
     let snapshots = await service.loadProviderSnapshots()
 
@@ -427,6 +429,24 @@ private struct BlockingCodexUsageLogReader: CodexUsageLogReading {
     func loadEvents() -> [UsageEvent] {
         Thread.sleep(forTimeInterval: blockSeconds)
         return events
+    }
+}
+
+private final class ControlledBlockingCodexUsageLogReader: CodexUsageLogReading, @unchecked Sendable {
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let events: [UsageEvent]
+
+    init(events: [UsageEvent]) {
+        self.events = events
+    }
+
+    func loadEvents() -> [UsageEvent] {
+        semaphore.wait()
+        return events
+    }
+
+    func unblock() {
+        semaphore.signal()
     }
 }
 
