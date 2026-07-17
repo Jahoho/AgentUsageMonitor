@@ -45,6 +45,12 @@
 - OpenRouter provider refresh isolates a single current-key, Keychain-read, catalog, or activity failure without discarding other valid official accounts.
 - The accessory app installs standard responder-chain Edit commands so `Command-V` reaches OpenRouter and DeepSeek secure text fields.
 - Dashboard refreshes do not preserve a previous OpenRouter snapshot when current official OpenRouter refresh fails.
+- Quota history receives raw current provider snapshots before dashboard fallback merging.
+- Capacity history accepts only fresh Ready Codex snapshots with a successful Official source, no fallback, an anonymous account scope, a finite remaining fraction and an explicit future reset timestamp.
+- Capacity history rejects errored, stale, fallback, unscoped, non-Codex, Observed, Estimated and reset-less quota inputs.
+- Quota account scopes remain stable for the same local installation, separate different accounts and never persist the source email or account id.
+- Quota history limits an unchanged reset cycle to one sample every five minutes, captures a new reset cycle immediately, retains approximately 90 days and compacts malformed or expired JSONL rows.
+- Quota-history files use `0600` permissions inside an app-owned `0700` directory.
 - Codex OAuth/RPC rate limit snapshots map into official provider bars.
 - Codex adapter returns an error when OAuth/RPC sources exceed the adapter-level official sync timeout.
 - Codex adapter retries a transient official transport failure once inside the same bounded refresh, has enough default budget for two complete source attempts, and records when that retry recovered current official data.
@@ -158,6 +164,8 @@
 - Temporarily make one managed-key activity request fail and confirm that key keeps official spend/limits while activity reports unavailable; other key activity remains visible.
 - Temporarily invalidate the OpenRouter key after a successful refresh and confirm the page reports the current official error instead of showing the prior values.
 - Confirm Codex reads usage automatically when `~/.codex/auth.json` or the Codex CLI RPC source is available.
+- After two eligible Codex refreshes at least five minutes apart, confirm `quota-observations-v1.jsonl` contains scalar samples only and does not contain the visible account email, access token or response text.
+- Temporarily make the Codex official refresh fail after a successful sample and confirm current quota reports the error rather than reading history as fallback.
 - Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
 - Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.
 - Confirm Codex `Today local tokens`, `30d local tokens`, `Latest local tokens`, `Top local model`, and hourly activity use reported `total_tokens`; each token card shows one total and a cached-input percentage, with no local USD or credit estimate.

@@ -10,7 +10,14 @@ The roadmap is intentionally conservative. New surfaces are accepted only when t
 - Maintain provider-scoped diagnostics, bounded refreshes and verified local packaging.
 - Establish CI, security reporting, privacy documentation and repeatable release checks.
 
-## v0.2 - Trusted Binary Distribution
+## v0.2 - Capacity Intelligence
+
+- Establish local, privacy-scoped history from current official quota samples without creating a fallback path.
+- Add Headroom and capacity weather from recent official samples, with every forecast labeled Estimated and insufficient data shown honestly.
+- Add a Codex weekly subscription review aligned to the official weekly reset cycle, including coverage and previous-cycle comparison.
+- Keep notifications, menu-bar weather and plan recommendations out of the first iteration until forecast quality is proven.
+
+## v0.3 - Trusted Binary Distribution
 
 - Select the final bundle identifier.
 - Add Developer ID signing, hardened runtime and notarization.
@@ -18,14 +25,14 @@ The roadmap is intentionally conservative. New surfaces are accepted only when t
 - Test install, update, rollback and removal on a clean Mac.
 - Publish checksums and concise release notes.
 
-## v0.3 - Provider Reliability
+## v0.4 - Provider Reliability
 
 - Add guarded live-contract tests that use opt-in test credentials outside normal CI.
 - Improve source diagnostics without exposing provider payloads or account data.
 - Add a stable Claude subscription reader only when an official machine-readable source is available.
 - Evaluate Tavily and other providers against the source-integrity requirements in `DATA_SOURCES.md`.
 
-## v0.4 - Product Quality
+## v0.5 - Product Quality
 
 - Expand VoiceOver labels and keyboard-only verification.
 - Add localized user-facing strings without changing source semantics.
@@ -37,4 +44,5 @@ The roadmap is intentionally conservative. New surfaces are accepted only when t
 - Cloud sync, remote dashboards and maintainer-operated telemetry.
 - Scraping private account pages as an automatic fallback.
 - Estimated subscription quota when an official source is unavailable.
+- Capacity Portfolio until enough providers expose comparable official quota windows.
 - Automatic updating before signed binary distribution exists.

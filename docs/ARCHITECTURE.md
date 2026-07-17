@@ -4,7 +4,7 @@
 
 The app separates provider-neutral usage concepts from macOS-specific integration.
 
-- `AgentUsageCore`: data models, confidence labels, provider snapshots, remaining-quota semantics, DeepSeek response/SSE parsing, aggregation helpers.
+- `AgentUsageCore`: data models, confidence labels, provider snapshots, remaining-quota semantics, scalar quota observations, DeepSeek response/SSE parsing, aggregation helpers.
 - `AgentUsageMonitor`: menu bar UI, provider adapters, provider orchestration, macOS Keychain, local command checks, official URL opening.
 - `Packaging`: local `.app` bundle metadata for personal review builds. Release and installation scripts build into hidden staging bundles, validate identity/resources before replacement, and retain the previous bundle until the staged replacement passes content verification.
 
@@ -43,6 +43,7 @@ The menu UI follows the same split:
 - `OpenRouterCredentialStore`: non-secret OpenRouter key metadata in Application Support plus per-key secrets in Keychain, including safe migration from the legacy single-key item.
 - `HTTPRequestParser`: bounded local HTTP request parsing for the DeepSeek proxy, including strict origin-form targets and case-insensitive singleton-header validation.
 - `JSONUsageEventStore`: append-only JSONL usage event storage with legacy JSON array migration.
+- `CapacityInsightService` and `QuotaObservationStore`: one-way capture of eligible current official quota samples into protected local JSONL history.
 
 ## Data Confidence
 
@@ -84,6 +85,21 @@ Provider pages intentionally show only high-signal information: remaining quota 
 Overview is the live work surface, not another detailed provider page or shortcut directory. It highlights the active provider, renders all-provider observed activity for today, and keeps provider health scannable. Low-frequency startup, website, and provider configuration actions live in Settings.
 
 Brand marks are bundled as local resources under `Sources/AgentUsageMonitor/Resources/Logos` so the menu UI does not depend on runtime network requests.
+
+## Official Quota History
+
+Official history is deliberately separated from the provider snapshot lifecycle. After a dashboard refresh has published its current provider snapshots and menu-bar status, `CapacityInsightService` receives the raw snapshots returned by `ProviderMonitorService`, before any permitted last-known fallback merge. It accepts Codex only in the first version and requires all of the following:
+
+- a Ready subscription snapshot from the current refresh;
+- at least one successful Official source diagnostic and no fallback diagnostic;
+- a fresh official account metric that can be converted to an opaque local scope;
+- an Official quota bar with a finite remaining fraction and explicit future `resetAt`.
+
+The persisted `QuotaObservation` contains only provider id, opaque account scope, quota-window id, remaining fraction, snapshot capture time and reset time. A random installation key stored in Keychain is used with HMAC-SHA256 to turn the normalized account identity into the opaque scope; email and account ids are never written to the history file.
+
+`QuotaObservationStore` appends JSONL samples under Application Support, limits each series to one sample every five minutes, records a changed reset cycle immediately and retains approximately 90 days. Expired, duplicate and malformed lines are removed during bounded compaction. The directory and file use `0700` and `0600` permissions respectively.
+
+This data flow is one-way by construction. Quota observations are inputs for future `Estimated` Headroom, capacity weather and weekly subscription review calculations. They are not `ProviderSnapshot` values and no provider adapter or dashboard fallback path reads them, so history cannot populate current Official bars or make a failed provider appear healthy. A Keychain or history-store failure is ignored by the current refresh path and only makes future capacity analysis unavailable.
 
 ## Codex Subscription Strategy
 
@@ -202,6 +218,7 @@ OpenRouter model rows group only activity items returned for the exact official 
 - DeepSeek local metadata contains labels and ids only, never raw API keys.
 - OpenRouter local metadata contains labels and ids only; every secret stays in its own Keychain item and is defensively redacted from provider errors.
 - AgentUsageMonitor-owned Application Support and cache directories are restricted to `0700`; metadata, observed-event and parsed-cache files are restricted to `0600`.
+- Official quota history stores only scalar samples under an HMAC-derived account scope; the random HMAC key remains in Keychain.
 - Provider errors should not include credential values.
 - Official account login remains in the user-controlled browser or CLI.
 - The DeepSeek proxy is isolated from the LAN by its loopback-only listener. Processes running as the same local user remain inside this trust boundary; requests without Authorization intentionally use the saved default DeepSeek key.
@@ -211,6 +228,8 @@ OpenRouter model rows group only activity items returned for the exact official 
 The app starts a local DeepSeek proxy after a DeepSeek API key is saved. The proxy only listens on `127.0.0.1` and exists to forward user-directed DeepSeek API requests. A non-nil listener object is not considered proof of readiness; Network.framework state drives the Settings status.
 
 The app also runs a background refresh loop for the menu bar status light. The loop uses the same provider loading path as manual refresh, so the menu bar reflects official quota and provider status as soon as the app can read them.
+
+After those current values are published, quota-history capture runs in a detached utility task. Slow or failed history IO therefore cannot delay provider rendering, change refresh health or extend the provider timeout budget.
 
 DeepSeek credential metadata and local proxy lifecycle are configured at launch and when settings change, not after every provider refresh. This keeps routine dashboard publication free of synchronous Keychain/proxy work on the main actor; provider adapters continue reading required secrets only from their background refresh tasks.
 

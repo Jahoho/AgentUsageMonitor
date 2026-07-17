@@ -17,7 +17,7 @@ An `Official` label describes the source of a value. It does not imply that the 
 
 | Provider surface | Source | Confidence | History and fallback behavior |
 | --- | --- | --- | --- |
-| Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Previous official quota is never used as fallback. |
+| Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Eligible scalar samples may be retained locally for analysis, but previous official quota is never used as fallback. |
 | Codex reset credits | Official reset-credit API or CLI RPC fields | Official | Expiry appears only when the source exposes an explicit date. No 30-day rule is inferred. |
 | Codex token activity | Explicit token counters in local live and archived session logs | Observed | Rolling 30x24-hour history after duplicate, replay and future-event filtering. Never populates quota bars. |
 | Claude subscription | Local Claude Code availability and user-opened official usage surface | Unavailable for exact quota | No scraping, local estimate or stale quota fallback. |
@@ -41,6 +41,12 @@ An `Official` label describes the source of a value. It does not imply that the 
 The menu bar performs a background provider refresh approximately every 60 seconds. Network timeouts and provider retries are bounded so one source cannot indefinitely block the dashboard.
 
 Observed `30d` summaries use a rolling 30x24-hour interval. OpenRouter official activity follows the completed dates returned by its API. Different time zones, provider-side refresh delays and account scope can make local observed totals differ from provider dashboards.
+
+## Local Official Quota History
+
+The app records a Codex quota observation only when the current raw provider refresh is Ready, an official source reports success without fallback, the account can be reduced to a local opaque scope, and the bar includes both a finite remaining fraction and an explicit future reset timestamp. The sample timestamp comes from the current provider snapshot, not from a previous dashboard state.
+
+Samples are rate-limited to one per provider, anonymous account scope and quota window every five minutes, with a new official reset cycle captured immediately. They are retained locally for approximately 90 days. This history is an input to future `Estimated` Headroom and subscription-review features only; it cannot populate current official bars, change provider health or hide a failed official refresh.
 
 ## Adding A Provider
 

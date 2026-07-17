@@ -4,6 +4,7 @@ import Security
 enum KeychainAccount {
     static let deepSeekAPIKey = "deepseek-api-key"
     static let openRouterAPIKey = "openrouter-api-key"
+    static let quotaHistoryScopeKey = "quota-history-scope-key"
 }
 
 protocol SecretStore: Sendable {
