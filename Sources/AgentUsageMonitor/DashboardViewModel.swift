@@ -38,6 +38,7 @@ final class DashboardViewModel: ObservableObject {
     private let deepSeekCredentialStore: any DeepSeekCredentialStoring
     private let openRouterCredentialStore: any OpenRouterCredentialStoring
     private let usageStore: any UsageEventStoring
+    private let capacityInsightRecorder: any CapacityInsightRecording
     private var deepSeekProxyServer: DeepSeekProxyServer?
     private var codexWebSessionWindow: CodexWebSessionWindow?
     private var lastRefreshAt: Date?
@@ -46,12 +47,14 @@ final class DashboardViewModel: ObservableObject {
         providerMonitorService: ProviderMonitorService = ProviderMonitorService(),
         deepSeekCredentialStore: any DeepSeekCredentialStoring = DeepSeekCredentialStore(),
         openRouterCredentialStore: any OpenRouterCredentialStoring = OpenRouterCredentialStore(),
-        usageStore: any UsageEventStoring = JSONUsageEventStore()
+        usageStore: any UsageEventStoring = JSONUsageEventStore(),
+        capacityInsightRecorder: any CapacityInsightRecording = CapacityInsightService()
     ) {
         self.providerMonitorService = providerMonitorService
         self.deepSeekCredentialStore = deepSeekCredentialStore
         self.openRouterCredentialStore = openRouterCredentialStore
         self.usageStore = usageStore
+        self.capacityInsightRecorder = capacityInsightRecorder
         reloadDeepSeekCredentials()
         reloadOpenRouterCredentials()
     }
@@ -82,10 +85,21 @@ final class DashboardViewModel: ObservableObject {
         snapshots = [overview] + providerSnapshots
         menuBarStatus = MenuBarStatusFactory.snapshot(from: providerSnapshots)
         lastRefreshAt = Date()
+        recordCurrentQuotaHistory(from: latestProviderSnapshots)
     }
 
     func startLocalServices() {
         startDeepSeekProxyIfPossible()
+    }
+
+    private func recordCurrentQuotaHistory(from currentSnapshots: [ProviderSnapshot]) {
+        let capacityInsightRecorder = capacityInsightRecorder
+        Task.detached(priority: .utility) {
+            await capacityInsightRecorder.recordCurrentQuota(
+                from: currentSnapshots,
+                now: Date()
+            )
+        }
     }
 
     private func mergedProviderSnapshots(_ latestSnapshots: [ProviderSnapshot]) -> [ProviderSnapshot] {

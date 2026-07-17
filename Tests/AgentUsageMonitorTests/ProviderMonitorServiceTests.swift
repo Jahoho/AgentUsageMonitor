@@ -199,6 +199,52 @@ import Testing
 }
 
 @MainActor
+@Test func dashboardQuotaHistoryReceivesRawCurrentSnapshotsBeforeFallbackMerging() async throws {
+    let current = testSnapshot(
+        id: "deepseek",
+        name: "DeepSeek",
+        kind: .api,
+        remainingFraction: 0.72
+    )
+    let failed = ProviderSnapshot(
+        id: "deepseek",
+        name: "DeepSeek",
+        kind: .api,
+        health: .error,
+        headline: "DeepSeek refresh failed",
+        metrics: [],
+        bars: [],
+        notes: [],
+        actions: []
+    )
+    let adapter = SequencedProviderAdapter(
+        providerID: "deepseek",
+        providerName: "DeepSeek",
+        providerKind: .api,
+        snapshots: [current, failed]
+    )
+    let capacityRecorder = BufferedCapacityInsightRecorder()
+    let viewModel = DashboardViewModel(
+        providerMonitorService: ProviderMonitorService(adapters: [adapter], providerTimeoutSeconds: 1),
+        deepSeekCredentialStore: EmptyDeepSeekCredentialStore(),
+        openRouterCredentialStore: EmptyOpenRouterCredentialStore(),
+        usageStore: InMemoryUsageEventStore(),
+        capacityInsightRecorder: capacityRecorder
+    )
+
+    await viewModel.refresh()
+    _ = await capacityRecorder.nextSnapshots()
+    await viewModel.refresh()
+    let recordedSecondRefresh = await capacityRecorder.nextSnapshots()
+
+    let displayed = try #require(viewModel.snapshots.first { $0.id == "deepseek" })
+    #expect(displayed.health == .ready)
+    #expect(displayed.bars.first?.remainingFraction == 0.72)
+    #expect(recordedSecondRefresh.first?.health == .error)
+    #expect(recordedSecondRefresh.first?.bars.isEmpty == true)
+}
+
+@MainActor
 @Test func dashboardRefreshDoesNotPreservePreviousCodexSnapshotWhenOfficialRefreshFails() async throws {
     let previousSuccessAt = Date(timeIntervalSince1970: 1_700_000_000)
     let latestFailureAt = Date(timeIntervalSince1970: 1_700_000_100)
@@ -546,6 +592,29 @@ private actor ConcurrentStartGate {
 
         await withCheckedContinuation { continuation in
             continuations.append(continuation)
+        }
+    }
+}
+
+private actor BufferedCapacityInsightRecorder: CapacityInsightRecording {
+    private var bufferedSnapshots: [[ProviderSnapshot]] = []
+    private var waiters: [CheckedContinuation<[ProviderSnapshot], Never>] = []
+
+    func recordCurrentQuota(from snapshots: [ProviderSnapshot], now: Date) async {
+        if waiters.isEmpty == false {
+            waiters.removeFirst().resume(returning: snapshots)
+        } else {
+            bufferedSnapshots.append(snapshots)
+        }
+    }
+
+    func nextSnapshots() async -> [ProviderSnapshot] {
+        if bufferedSnapshots.isEmpty == false {
+            return bufferedSnapshots.removeFirst()
+        }
+
+        return await withCheckedContinuation { continuation in
+            waiters.append(continuation)
         }
     }
 }
