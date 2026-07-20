@@ -2,11 +2,14 @@ import AgentUsageCore
 import CryptoKit
 import Foundation
 
-protocol CapacityInsightRecording: Sendable {
-    func recordCurrentQuota(from snapshots: [ProviderSnapshot], now: Date) async
+protocol CapacityInsightProviding: Sendable {
+    func refreshInsights(
+        from snapshots: [ProviderSnapshot],
+        now: Date
+    ) async -> [String: CapacityInsight]
 }
 
-actor CapacityInsightService: CapacityInsightRecording {
+actor CapacityInsightService: CapacityInsightProviding {
     static let maximumSnapshotAge: TimeInterval = 5 * 60
     static let futureDateTolerance: TimeInterval = 5 * 60
 
@@ -22,72 +25,134 @@ actor CapacityInsightService: CapacityInsightRecording {
         self.secretStore = secretStore
     }
 
-    func recordCurrentQuota(from snapshots: [ProviderSnapshot], now: Date = Date()) async {
-        do {
-            let observations = try observations(from: snapshots, now: now)
-            guard observations.isEmpty == false else {
-                return
-            }
-            try await observationStore.record(observations, now: now)
-        } catch {
-            // Historical analysis is optional and must never affect current provider health.
-        }
-    }
-
-    private func observations(
+    func refreshInsights(
         from snapshots: [ProviderSnapshot],
-        now: Date
-    ) throws -> [QuotaObservation] {
-        var observations: [QuotaObservation] = []
+        now: Date = Date()
+    ) async -> [String: CapacityInsight] {
+        guard let snapshot = snapshots.first(where: { $0.id == "codex" }) else {
+            return [:]
+        }
+        if let reason = Self.currentUnavailabilityReason(for: snapshot, now: now) {
+            return unavailable(reason, now: now)
+        }
+        guard let accountIdentity = Self.officialAccountIdentity(in: snapshot) else {
+            return unavailable(.accountScopeUnavailable, now: now)
+        }
 
-        for snapshot in snapshots where snapshot.id == "codex" {
-            guard snapshot.kind == .subscription,
-                  snapshot.health == .ready,
-                  snapshot.sourceDiagnostics?.contains(where: { diagnostic in
-                      diagnostic.confidence == .official
-                          && diagnostic.status == .success
-                          && diagnostic.isFallback == false
-                  }) == true,
-                  snapshot.sourceDiagnostics?.contains(where: \.isFallback) != true,
-                  isFresh(snapshot.updatedAt, now: now),
-                  let accountIdentity = officialAccountIdentity(in: snapshot)
-            else {
-                continue
-            }
-
+        do {
             let accountScopeID = try opaqueScopeID(
                 providerID: snapshot.id,
                 accountIdentity: accountIdentity
             )
-
-            for bar in snapshot.bars {
-                guard bar.confidence == .official,
-                      let remainingFraction = bar.remainingFraction,
-                      remainingFraction.isFinite,
-                      (0...1).contains(remainingFraction),
-                      let resetAt = bar.resetAt,
-                      resetAt > snapshot.updatedAt
-                else {
-                    continue
-                }
-
-                observations.append(
-                    QuotaObservation(
-                        providerID: snapshot.id,
-                        accountScopeID: accountScopeID,
-                        quotaID: bar.id,
-                        remainingFraction: remainingFraction,
-                        capturedAt: snapshot.updatedAt,
-                        resetAt: resetAt
-                    )
-                )
+            let current = quotaObservations(
+                from: snapshot,
+                accountScopeID: accountScopeID,
+                now: now
+            )
+            guard current.isEmpty == false else {
+                let reason: HeadroomAvailabilityReason = Self.hasOfficialRemainingQuota(snapshot)
+                    ? .resetUnavailable
+                    : .currentQuotaUnavailable
+                return unavailable(reason, now: now)
             }
-        }
 
-        return observations
+            try await observationStore.record(current, now: now)
+            let history = try await observationStore.load(now: now)
+            guard let insight = HeadroomAnalyzer.analyze(
+                current: current,
+                history: history,
+                now: now
+            ) else {
+                return unavailable(.insufficientHistory, now: now)
+            }
+            return [snapshot.id: insight]
+        } catch {
+            // History and forecasts are optional and must never affect current provider health.
+            return unavailable(.historyUnavailable, now: now)
+        }
     }
 
-    private func officialAccountIdentity(in snapshot: ProviderSnapshot) -> String? {
+    nonisolated static func currentUnavailabilityReason(
+        for snapshot: ProviderSnapshot,
+        now: Date
+    ) -> HeadroomAvailabilityReason? {
+        guard snapshot.kind == .subscription,
+              snapshot.health == .ready,
+              snapshot.sourceDiagnostics?.contains(where: { diagnostic in
+                diagnostic.confidence == .official
+                    && diagnostic.status == .success
+                    && diagnostic.isFallback == false
+              }) == true,
+              snapshot.sourceDiagnostics?.contains(where: \.isFallback) != true,
+              isFresh(snapshot.updatedAt, now: now)
+        else {
+            return .currentQuotaUnavailable
+        }
+        guard officialAccountIdentity(in: snapshot) != nil else {
+            return .accountScopeUnavailable
+        }
+        guard snapshot.bars.contains(where: { bar in
+            bar.confidence == .official
+                && bar.remainingFraction?.isFinite == true
+                && bar.remainingFraction.map { (0...1).contains($0) } == true
+                && bar.resetAt.map { $0 > now } == true
+        }) else {
+            return hasOfficialRemainingQuota(snapshot)
+                ? .resetUnavailable
+                : .currentQuotaUnavailable
+        }
+        return nil
+    }
+
+    private func quotaObservations(
+        from snapshot: ProviderSnapshot,
+        accountScopeID: String,
+        now: Date
+    ) -> [QuotaObservation] {
+        snapshot.bars.compactMap { bar in
+            guard bar.confidence == .official,
+                  let remainingFraction = bar.remainingFraction,
+                  remainingFraction.isFinite,
+                  (0...1).contains(remainingFraction),
+                  let resetAt = bar.resetAt,
+                  resetAt > now
+            else {
+                return nil
+            }
+
+            return QuotaObservation(
+                providerID: snapshot.id,
+                accountScopeID: accountScopeID,
+                quotaID: bar.id,
+                remainingFraction: remainingFraction,
+                capturedAt: snapshot.updatedAt,
+                resetAt: resetAt
+            )
+        }
+    }
+
+    private nonisolated static func hasOfficialRemainingQuota(_ snapshot: ProviderSnapshot) -> Bool {
+        snapshot.bars.contains { bar in
+            bar.confidence == .official
+                && bar.remainingFraction?.isFinite == true
+                && bar.remainingFraction.map { (0...1).contains($0) } == true
+        }
+    }
+
+    private func unavailable(
+        _ reason: HeadroomAvailabilityReason,
+        now: Date
+    ) -> [String: CapacityInsight] {
+        [
+            "codex": CapacityInsight.unavailable(
+                providerID: "codex",
+                reason: reason,
+                generatedAt: now
+            )
+        ]
+    }
+
+    private nonisolated static func officialAccountIdentity(in snapshot: ProviderSnapshot) -> String? {
         guard let accountMetric = snapshot.metrics.first(where: { metric in
             metric.id == "account" && metric.confidence == .official
         }) else {
@@ -100,7 +165,7 @@ actor CapacityInsightService: CapacityInsightRecording {
         return normalized.isEmpty ? nil : normalized
     }
 
-    private func isFresh(_ capturedAt: Date, now: Date) -> Bool {
+    private nonisolated static func isFresh(_ capturedAt: Date, now: Date) -> Bool {
         let age = now.timeIntervalSince(capturedAt)
         return age <= Self.maximumSnapshotAge && age >= -Self.futureDateTolerance
     }

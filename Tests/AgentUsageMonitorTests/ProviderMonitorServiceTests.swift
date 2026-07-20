@@ -223,19 +223,19 @@ import Testing
         providerKind: .api,
         snapshots: [current, failed]
     )
-    let capacityRecorder = BufferedCapacityInsightRecorder()
+    let capacityProvider = BufferedCapacityInsightProvider()
     let viewModel = DashboardViewModel(
         providerMonitorService: ProviderMonitorService(adapters: [adapter], providerTimeoutSeconds: 1),
         deepSeekCredentialStore: EmptyDeepSeekCredentialStore(),
         openRouterCredentialStore: EmptyOpenRouterCredentialStore(),
         usageStore: InMemoryUsageEventStore(),
-        capacityInsightRecorder: capacityRecorder
+        capacityInsightProvider: capacityProvider
     )
 
     await viewModel.refresh()
-    _ = await capacityRecorder.nextSnapshots()
+    _ = await capacityProvider.nextSnapshots()
     await viewModel.refresh()
-    let recordedSecondRefresh = await capacityRecorder.nextSnapshots()
+    let recordedSecondRefresh = await capacityProvider.nextSnapshots()
 
     let displayed = try #require(viewModel.snapshots.first { $0.id == "deepseek" })
     #expect(displayed.health == .ready)
@@ -596,16 +596,20 @@ private actor ConcurrentStartGate {
     }
 }
 
-private actor BufferedCapacityInsightRecorder: CapacityInsightRecording {
+private actor BufferedCapacityInsightProvider: CapacityInsightProviding {
     private var bufferedSnapshots: [[ProviderSnapshot]] = []
     private var waiters: [CheckedContinuation<[ProviderSnapshot], Never>] = []
 
-    func recordCurrentQuota(from snapshots: [ProviderSnapshot], now: Date) async {
+    func refreshInsights(
+        from snapshots: [ProviderSnapshot],
+        now: Date
+    ) async -> [String: CapacityInsight] {
         if waiters.isEmpty == false {
             waiters.removeFirst().resume(returning: snapshots)
         } else {
             bufferedSnapshots.append(snapshots)
         }
+        return [:]
     }
 
     func nextSnapshots() async -> [ProviderSnapshot] {

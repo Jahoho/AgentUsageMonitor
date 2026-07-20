@@ -5,6 +5,7 @@ import SwiftUI
 struct OverviewView: View {
     let snapshot: ProviderSnapshot
     let providerSnapshots: [ProviderSnapshot]
+    let capacityInsights: [String: CapacityInsight]
 
     private var activeAgent: OverviewActiveAgent? {
         OverviewActiveAgent.resolve(from: providerSnapshots)
@@ -15,6 +16,13 @@ struct OverviewView: View {
             SnapshotTitle(snapshot: snapshot)
 
             ActiveAgentPanel(agent: activeAgent)
+
+            if let codexSnapshot = providerSnapshots.first(where: { $0.id == "codex" }) {
+                CompactCapacityWeatherView(
+                    snapshot: codexSnapshot,
+                    insight: capacityInsights[codexSnapshot.id]
+                )
+            }
 
             OverviewActivityPanel(snapshot: snapshot)
 

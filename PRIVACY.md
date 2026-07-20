@@ -12,7 +12,7 @@ Provider requests go directly from the Mac to the provider named in the interfac
 | Provider key labels and local ids | Identify multiple configured accounts | `~/Library/Application Support/AgentUsageMonitor/` |
 | DeepSeek response usage fields | Build observed token and activity views | `usage-events.jsonl` in Application Support |
 | Codex access token | Request current official Codex quota | Read from the existing Codex auth file and held in memory; not copied into app state |
-| Codex official quota samples | Support local Headroom, capacity weather and subscription review analysis | Scalar samples in `quota-observations-v1.jsonl`; account identity is replaced with a keyed opaque scope before storage |
+| Codex official quota samples | Support local Headroom, Capacity Weather and subscription review analysis | Scalar samples in `quota-observations-v1.jsonl`; account identity is replaced with a keyed opaque scope before storage, and forecasts are computed locally rather than persisted |
 | Codex session usage fields | Build local observed token and activity views | Parsed local cache under `~/Library/Caches/AgentUsageMonitor/` |
 | Launch-at-login choice | Register the packaged app with macOS | Managed by `SMAppService` and macOS |
 
@@ -60,6 +60,8 @@ The optional Codex Web Debug window loads the official ChatGPT site only when th
 ## Retention And Removal
 
 Official quota observations are sampled no more than once every five minutes per quota window and retained for approximately 90 days. The history contains provider, anonymous account scope, quota-window id, remaining fraction, capture time and official reset time only. It does not contain email addresses, account ids, access tokens, response payloads or complete provider snapshots. A random local key used to create the anonymous account scope is stored in Keychain under service `AgentUsageMonitor`.
+
+Headroom and Capacity Weather are computed on the Mac from those scalar samples and the current Official quota. Forecast outputs are held in memory, are not sent to the maintainer or a third party, and are never used as a fallback when current Official quota is unavailable.
 
 Deleting a DeepSeek or OpenRouter credential in Settings removes its Keychain secret and local metadata entry. To remove all remaining local application data after quitting the app, delete:
 

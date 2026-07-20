@@ -37,9 +37,11 @@ import Testing
         ]
     )
 
-    await service.recordCurrentQuota(from: [snapshot], now: now)
+    let insights = await service.refreshInsights(from: [snapshot], now: now)
     let observations = try await observationStore.load(now: now)
 
+    #expect(insights["codex"]?.weather == .learning)
+    #expect(insights["codex"]?.confidence == .unavailable)
     #expect(observations.map(\.quotaID) == ["codex-session", "codex-weekly"])
     #expect(observations.map(\.remainingFraction) == [0.75, 0.4])
     #expect(observations.allSatisfy { $0.capturedAt == now })
@@ -73,9 +75,94 @@ import Testing
         capacitySnapshot(updatedAt: now, sourceStatus: .failure, bars: validBars)
     ]
 
-    await service.recordCurrentQuota(from: rejectedSnapshots, now: now)
+    for rejectedSnapshot in rejectedSnapshots {
+        _ = await service.refreshInsights(from: [rejectedSnapshot], now: now)
+    }
 
     #expect(try await observationStore.load(now: now).isEmpty)
+}
+
+@Test func capacityInsightFailsClosedWithoutLoadingHistoryWhenCurrentQuotaFails() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let historicalObservation = QuotaObservation(
+        providerID: "codex",
+        accountScopeID: "historical-scope",
+        quotaID: "codex-session",
+        remainingFraction: 0.8,
+        capturedAt: now.addingTimeInterval(-1_800),
+        resetAt: now.addingTimeInterval(3_600)
+    )
+    let observationStore = CapacityTestObservationStore(observations: [historicalObservation])
+    let service = CapacityInsightService(
+        observationStore: observationStore,
+        secretStore: CapacityTestSecretStore()
+    )
+    let failedSnapshot = capacitySnapshot(
+        updatedAt: now,
+        health: .error,
+        bars: [
+            capacityBar(
+                id: "codex-session",
+                remainingFraction: 0.7,
+                resetAt: now.addingTimeInterval(3_600)
+            )
+        ]
+    )
+
+    let insights = await service.refreshInsights(from: [failedSnapshot], now: now)
+
+    #expect(insights["codex"]?.weather == .fog)
+    #expect(insights["codex"]?.availabilityReason == .currentQuotaUnavailable)
+    #expect(await observationStore.loadCallCount() == 0)
+}
+
+@Test func capacityInsightExplainsMissingResetAndHistoryFailures() async {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let missingResetService = CapacityInsightService(
+        observationStore: CapacityTestObservationStore(),
+        secretStore: CapacityTestSecretStore()
+    )
+    let missingReset = capacitySnapshot(
+        updatedAt: now,
+        bars: [
+            capacityBar(
+                id: "codex-session",
+                remainingFraction: 0.7,
+                resetAt: nil
+            )
+        ]
+    )
+
+    let missingResetInsights = await missingResetService.refreshInsights(
+        from: [missingReset],
+        now: now
+    )
+
+    #expect(missingResetInsights["codex"]?.weather == .fog)
+    #expect(missingResetInsights["codex"]?.availabilityReason == .resetUnavailable)
+
+    let failingHistoryService = CapacityInsightService(
+        observationStore: CapacityTestObservationStore(shouldFailLoading: true),
+        secretStore: CapacityTestSecretStore()
+    )
+    let currentSnapshot = capacitySnapshot(
+        updatedAt: now,
+        bars: [
+            capacityBar(
+                id: "codex-session",
+                remainingFraction: 0.7,
+                resetAt: now.addingTimeInterval(3_600)
+            )
+        ]
+    )
+
+    let failingHistoryInsights = await failingHistoryService.refreshInsights(
+        from: [currentSnapshot],
+        now: now
+    )
+
+    #expect(failingHistoryInsights["codex"]?.weather == .fog)
+    #expect(failingHistoryInsights["codex"]?.availabilityReason == .historyUnavailable)
 }
 
 @Test func capacityInsightScopeIsStablePerInstallationAndSeparatesAccounts() async throws {
@@ -99,15 +186,15 @@ import Testing
         )
     ]
 
-    await firstService.recordCurrentQuota(
+    _ = await firstService.refreshInsights(
         from: [capacitySnapshot(updatedAt: now, accountValue: "person@example.com", bars: bars)],
         now: now
     )
-    await secondService.recordCurrentQuota(
+    _ = await secondService.refreshInsights(
         from: [capacitySnapshot(updatedAt: now, accountValue: "PERSON@example.com", bars: bars)],
         now: now
     )
-    await secondService.recordCurrentQuota(
+    _ = await secondService.refreshInsights(
         from: [capacitySnapshot(updatedAt: now, accountValue: "other@example.com", bars: bars)],
         now: now
     )
@@ -125,15 +212,37 @@ import Testing
 }
 
 private actor CapacityTestObservationStore: QuotaObservationStoring {
-    private var observations: [QuotaObservation] = []
+    private var observations: [QuotaObservation]
+    private let shouldFailLoading: Bool
+    private var loadCalls = 0
+
+    init(
+        observations: [QuotaObservation] = [],
+        shouldFailLoading: Bool = false
+    ) {
+        self.observations = observations
+        self.shouldFailLoading = shouldFailLoading
+    }
 
     func record(_ candidates: [QuotaObservation], now: Date) async throws {
         observations.append(contentsOf: candidates)
     }
 
     func load(now: Date) async throws -> [QuotaObservation] {
-        observations
+        loadCalls += 1
+        if shouldFailLoading {
+            throw CapacityTestObservationStoreError.loadFailed
+        }
+        return observations
     }
+
+    func loadCallCount() -> Int {
+        loadCalls
+    }
+}
+
+private enum CapacityTestObservationStoreError: Error {
+    case loadFailed
 }
 
 private final class CapacityTestSecretStore: SecretStore, @unchecked Sendable {

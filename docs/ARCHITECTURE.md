@@ -4,7 +4,7 @@
 
 The app separates provider-neutral usage concepts from macOS-specific integration.
 
-- `AgentUsageCore`: data models, confidence labels, provider snapshots, remaining-quota semantics, scalar quota observations, DeepSeek response/SSE parsing, aggregation helpers.
+- `AgentUsageCore`: data models, confidence labels, provider snapshots, remaining-quota semantics, scalar quota observations, pure Headroom analysis, DeepSeek response/SSE parsing, aggregation helpers.
 - `AgentUsageMonitor`: menu bar UI, provider adapters, provider orchestration, macOS Keychain, local command checks, official URL opening.
 - `Packaging`: local `.app` bundle metadata for personal review builds. Release and installation scripts build into hidden staging bundles, validate identity/resources before replacement, and retain the previous bundle until the staged replacement passes content verification.
 
@@ -35,15 +35,15 @@ The menu UI follows the same split:
 - `DashboardView`: fixed-width, content-measured popover shell, one bounded root scroll surface, and selected page routing.
 - `HeaderView`, `BrandIconView`, and `BrandLogoStore`: top navigation and bundled logo rendering.
 - `ApplicationMenu`: standard AppKit responder-chain commands for Undo, Cut, Copy, Paste, and Select All in the accessory-style menu bar app.
-- `OverviewView`: active-agent summary, all-provider activity aggregation, and concise provider source health.
-- `ProviderSnapshotView`, `UsageViews`, and `ActivityStrip`: provider pages, quota bars, metric tiles, account selection, model rows, and hourly/daily activity charts.
+- `OverviewView`: active-agent summary, compact Capacity Weather, all-provider activity aggregation, and concise provider source health.
+- `ProviderSnapshotView`, `CapacityWeatherView`, `UsageViews`, and `ActivityStrip`: provider pages, Headroom forecasts, quota bars, metric tiles, account selection, model rows, and hourly/daily activity charts.
 - `SettingsView`: credentials, login shortcuts, proxy endpoint, and app controls.
 - `LaunchAtLoginController`: thin wrapper around `SMAppService.mainApp` that exposes readable state for SwiftUI and preserves macOS approval/error messages.
 - `DeepSeekCredentialStore`: non-secret DeepSeek key metadata in Application Support plus per-key secrets in Keychain.
 - `OpenRouterCredentialStore`: non-secret OpenRouter key metadata in Application Support plus per-key secrets in Keychain, including safe migration from the legacy single-key item.
 - `HTTPRequestParser`: bounded local HTTP request parsing for the DeepSeek proxy, including strict origin-form targets and case-insensitive singleton-header validation.
 - `JSONUsageEventStore`: append-only JSONL usage event storage with legacy JSON array migration.
-- `CapacityInsightService` and `QuotaObservationStore`: one-way capture of eligible current official quota samples into protected local JSONL history.
+- `CapacityInsightService` and `QuotaObservationStore`: capture eligible current official quota samples, load protected local JSONL history, and publish a separate derived `CapacityInsight` model.
 
 ## Data Confidence
 
@@ -99,7 +99,21 @@ The persisted `QuotaObservation` contains only provider id, opaque account scope
 
 `QuotaObservationStore` appends JSONL samples under Application Support, limits each series to one sample every five minutes, records a changed reset cycle immediately and retains approximately 90 days. Expired, duplicate and malformed lines are removed during bounded compaction. The directory and file use `0700` and `0600` permissions respectively.
 
-This data flow is one-way by construction. Quota observations are inputs for future `Estimated` Headroom, capacity weather and weekly subscription review calculations. They are not `ProviderSnapshot` values and no provider adapter or dashboard fallback path reads them, so history cannot populate current Official bars or make a failed provider appear healthy. A Keychain or history-store failure is ignored by the current refresh path and only makes future capacity analysis unavailable.
+The history read path terminates in a separate `CapacityInsight` model used only by Capacity Weather views. Quota observations never become `ProviderSnapshot` values, and no provider adapter, current-quota bar, menu-bar status or dashboard fallback path reads them. History therefore cannot populate current Official bars or make a failed provider appear healthy. A Keychain or history-store failure leaves current provider health unchanged and makes only the forecast unavailable.
+
+## Headroom And Capacity Weather
+
+`HeadroomAnalyzer` is a pure Core calculation. It matches samples only within the same provider, opaque account scope, quota-window id and official reset cycle. A remaining-capacity increase greater than two percentage points starts a new trend segment so a reset or capacity adjustment is not interpreted as consumption.
+
+Every forecast requires at least three samples. Windows whose observed reset lead exceeds 24 hours use up to 24 hours of recent history and require at least 6 hours of coverage; shorter windows use up to 2 hours and require at least 30 minutes. The recent consumption pace is projected to the current Official reset time:
+
+- `Clear`: projected remaining capacity at reset is at least 15%.
+- `Windy`: projected remaining capacity at reset is positive but below 15%.
+- `Storm`: the recent pace projects exhaustion at or before reset.
+- `Learning`: the current Official quota is valid but same-cycle history is not sufficient.
+- `Fog`: the current Official quota, account scope, reset time or local history is unavailable.
+
+Clear, Windy and Storm are always labeled `Estimated`; Learning and Fog are `Unavailable`. When multiple official quota windows are present, the most constraining forecast becomes the provider weather while each window remains visible on the Codex detail page. If current Official quota is unavailable, `CapacityInsightService` returns Fog before loading history. Previous samples are never used to synthesize a current value.
 
 ## Codex Subscription Strategy
 
@@ -229,7 +243,7 @@ The app starts a local DeepSeek proxy after a DeepSeek API key is saved. The pro
 
 The app also runs a background refresh loop for the menu bar status light. The loop uses the same provider loading path as manual refresh, so the menu bar reflects official quota and provider status as soon as the app can read them.
 
-After those current values are published, quota-history capture runs in a detached utility task. Slow or failed history IO therefore cannot delay provider rendering, change refresh health or extend the provider timeout budget.
+After those current values are published, quota-history capture and Headroom analysis run in an asynchronous post-refresh task. Slow or failed history IO therefore cannot delay provider rendering, change refresh health or extend the provider timeout budget. The result returns only to the separate Capacity Weather view state.
 
 DeepSeek credential metadata and local proxy lifecycle are configured at launch and when settings change, not after every provider refresh. This keeps routine dashboard publication free of synchronous Keychain/proxy work on the main actor; provider adapters continue reading required secrets only from their background refresh tasks.
 
