@@ -18,6 +18,7 @@ An `Official` label describes the source of a value. It does not imply that the 
 | Provider surface | Source | Confidence | History and fallback behavior |
 | --- | --- | --- | --- |
 | Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Eligible scalar samples may be retained locally for analysis, but previous official quota is never used as fallback. |
+| Codex Headroom and Capacity Weather | Recent same-account, same-window and same-reset-cycle Official quota samples | Estimated when sufficient; otherwise Unavailable | Requires at least three samples plus 30 minutes of coverage for short windows or 6 hours for long windows. Never supplies current quota. |
 | Codex reset credits | Official reset-credit API or CLI RPC fields | Official | Expiry appears only when the source exposes an explicit date. No 30-day rule is inferred. |
 | Codex token activity | Explicit token counters in local live and archived session logs | Observed | Rolling 30x24-hour history after duplicate, replay and future-event filtering. Never populates quota bars. |
 | Claude subscription | Local Claude Code availability and user-opened official usage surface | Unavailable for exact quota | No scraping, local estimate or stale quota fallback. |
@@ -46,7 +47,13 @@ Observed `30d` summaries use a rolling 30x24-hour interval. OpenRouter official 
 
 The app records a Codex quota observation only when the current raw provider refresh is Ready, an official source reports success without fallback, the account can be reduced to a local opaque scope, and the bar includes both a finite remaining fraction and an explicit future reset timestamp. The sample timestamp comes from the current provider snapshot, not from a previous dashboard state.
 
-Samples are rate-limited to one per provider, anonymous account scope and quota window every five minutes, with a new official reset cycle captured immediately. They are retained locally for approximately 90 days. This history is an input to future `Estimated` Headroom and subscription-review features only; it cannot populate current official bars, change provider health or hide a failed official refresh.
+Samples are rate-limited to one per provider, anonymous account scope and quota window every five minutes, with a new official reset cycle captured immediately. They are retained locally for approximately 90 days.
+
+Headroom compares only samples from the same provider, anonymous account scope, quota-window id and official reset cycle. It starts a new trend after a material capacity increase, then projects the recent consumption pace to the current official reset. A short window uses up to two hours of recent samples and needs at least 30 minutes of coverage; a long window uses up to 24 hours and needs at least 6 hours. Both require at least three samples.
+
+The resulting Capacity Weather is `Clear` when at least 15% is projected to remain at reset, `Windy` when the positive projection falls below 15%, and `Storm` when exhaustion is projected at or before reset. These states are always `Estimated`. Insufficient coverage is `Learning`, while missing current official quota, account scope, reset timing or readable local history is `Fog`; both are `Unavailable`. With multiple windows, the most constraining valid forecast is shown as the overall weather.
+
+History cannot populate current official bars, change provider health or hide a failed official refresh. In particular, a current official failure becomes Fog before history is loaded; no stale sample is treated as present capacity. The same history may later support the separately documented weekly subscription review.
 
 ## Adding A Provider
 

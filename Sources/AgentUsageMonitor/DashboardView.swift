@@ -89,10 +89,15 @@ struct DashboardView: View {
         } else if viewModel.selectedProviderID == "overview", let snapshot = viewModel.selectedSnapshot {
             OverviewView(
                 snapshot: snapshot,
-                providerSnapshots: viewModel.snapshots.filter { $0.id != "overview" }
+                providerSnapshots: viewModel.snapshots.filter { $0.id != "overview" },
+                capacityInsights: viewModel.capacityInsights
             )
         } else if let snapshot = viewModel.selectedSnapshot {
-            ProviderSnapshotView(snapshot: snapshot, openAction: viewModel.open)
+            ProviderSnapshotView(
+                snapshot: snapshot,
+                capacityInsight: viewModel.capacityInsights[snapshot.id],
+                openAction: viewModel.open
+            )
         } else {
             ContentUnavailableView("No providers", systemImage: "gauge.with.dots.needle.0percent")
                 .padding(24)

@@ -23,6 +23,7 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var snapshots: [ProviderSnapshot] = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var menuBarStatus = MenuBarStatusFactory.snapshot(from: [])
+    @Published private(set) var capacityInsights: [String: CapacityInsight] = [:]
     @Published var deepSeekAPIKeyLabelInput = ""
     @Published var deepSeekAPIKeyInput = ""
     @Published var settingsMessage = ""
@@ -38,9 +39,10 @@ final class DashboardViewModel: ObservableObject {
     private let deepSeekCredentialStore: any DeepSeekCredentialStoring
     private let openRouterCredentialStore: any OpenRouterCredentialStoring
     private let usageStore: any UsageEventStoring
-    private let capacityInsightRecorder: any CapacityInsightRecording
+    private let capacityInsightProvider: any CapacityInsightProviding
     private var deepSeekProxyServer: DeepSeekProxyServer?
     private var codexWebSessionWindow: CodexWebSessionWindow?
+    private var capacityInsightTask: Task<Void, Never>?
     private var lastRefreshAt: Date?
 
     init(
@@ -48,13 +50,13 @@ final class DashboardViewModel: ObservableObject {
         deepSeekCredentialStore: any DeepSeekCredentialStoring = DeepSeekCredentialStore(),
         openRouterCredentialStore: any OpenRouterCredentialStoring = OpenRouterCredentialStore(),
         usageStore: any UsageEventStoring = JSONUsageEventStore(),
-        capacityInsightRecorder: any CapacityInsightRecording = CapacityInsightService()
+        capacityInsightProvider: any CapacityInsightProviding = CapacityInsightService()
     ) {
         self.providerMonitorService = providerMonitorService
         self.deepSeekCredentialStore = deepSeekCredentialStore
         self.openRouterCredentialStore = openRouterCredentialStore
         self.usageStore = usageStore
-        self.capacityInsightRecorder = capacityInsightRecorder
+        self.capacityInsightProvider = capacityInsightProvider
         reloadDeepSeekCredentials()
         reloadOpenRouterCredentials()
     }
@@ -85,20 +87,60 @@ final class DashboardViewModel: ObservableObject {
         snapshots = [overview] + providerSnapshots
         menuBarStatus = MenuBarStatusFactory.snapshot(from: providerSnapshots)
         lastRefreshAt = Date()
-        recordCurrentQuotaHistory(from: latestProviderSnapshots)
+        refreshCapacityInsights(from: latestProviderSnapshots)
     }
 
     func startLocalServices() {
         startDeepSeekProxyIfPossible()
     }
 
-    private func recordCurrentQuotaHistory(from currentSnapshots: [ProviderSnapshot]) {
-        let capacityInsightRecorder = capacityInsightRecorder
-        Task.detached(priority: .utility) {
-            await capacityInsightRecorder.recordCurrentQuota(
+    private func refreshCapacityInsights(from currentSnapshots: [ProviderSnapshot]) {
+        let now = Date()
+        if let currentCodex = currentSnapshots.first(where: { $0.id == "codex" }) {
+            if let reason = CapacityInsightService.currentUnavailabilityReason(
+                for: currentCodex,
+                now: now
+            ) {
+                capacityInsights["codex"] = CapacityInsight.unavailable(
+                    providerID: "codex",
+                    reason: reason,
+                    generatedAt: now
+                )
+            } else if let existing = capacityInsights["codex"],
+                      capacityInsightMatchesCurrentQuota(existing, snapshot: currentCodex) == false {
+                capacityInsights.removeValue(forKey: "codex")
+            }
+        } else {
+            capacityInsights.removeValue(forKey: "codex")
+        }
+
+        capacityInsightTask?.cancel()
+        let capacityInsightProvider = capacityInsightProvider
+        capacityInsightTask = Task { [weak self] in
+            let insights = await capacityInsightProvider.refreshInsights(
                 from: currentSnapshots,
-                now: Date()
+                now: now
             )
+            guard Task.isCancelled == false else {
+                return
+            }
+            self?.capacityInsights = insights
+        }
+    }
+
+    private func capacityInsightMatchesCurrentQuota(
+        _ insight: CapacityInsight,
+        snapshot: ProviderSnapshot
+    ) -> Bool {
+        guard insight.windows.isEmpty == false else {
+            return false
+        }
+
+        return insight.windows.allSatisfy { window in
+            guard let currentReset = snapshot.bars.first(where: { $0.id == window.quotaID })?.resetAt else {
+                return false
+            }
+            return abs(currentReset.timeIntervalSince(window.resetAt)) <= 5 * 60
         }
     }
 

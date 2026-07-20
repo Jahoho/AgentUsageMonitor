@@ -4,8 +4,14 @@ Notable user-visible changes are documented here. The project follows semantic v
 
 ## [Unreleased]
 
+### Added
+
+- Privacy-scoped local history for eligible current official Codex quota samples.
+- Estimated Codex Headroom and Capacity Weather in Overview and the Codex detail page, with explicit Clear, Windy, Storm, Learning and Fog states.
+
 ### Planned
 
+- Weekly Codex subscription review aligned to official reset cycles.
 - Signed and notarized macOS distribution.
 - Additional providers only when a stable official or explicitly observed usage source is available.
 
