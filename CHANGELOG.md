@@ -7,7 +7,7 @@ Notable user-visible changes are documented here. The project follows semantic v
 ### Added
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
-- Estimated Codex Headroom and Capacity Weather in Overview and the Codex detail page, with explicit Clear, Windy, Storm, Learning and Fog states.
+- A compact Estimated Codex quota projection in Overview and the Codex detail page, showing a remaining-at-reset range or possible exhaustion while suppressing sparse and unstable forecasts.
 
 ### Planned
 

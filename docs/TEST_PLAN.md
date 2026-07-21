@@ -51,10 +51,12 @@
 - Quota account scopes remain stable for the same local installation, separate different accounts and never persist the source email or account id.
 - Quota history limits an unchanged reset cycle to one sample every five minutes, captures a new reset cycle immediately, retains approximately 90 days and compacts malformed or expired JSONL rows.
 - Quota-history files use `0600` permissions inside an app-owned `0700` directory.
-- Headroom analysis isolates provider, anonymous account, quota-window and reset-cycle series; material capacity increases begin a new trend segment.
-- Headroom requires at least three samples and the documented 30-minute short-window or 6-hour long-window coverage before producing an estimate.
-- Capacity Weather selects the most constraining eligible window and covers Clear, Windy, Storm and no-consumption projections.
-- Capacity insights fail closed to Fog without loading history when current Official quota fails, and explain missing reset timing or history storage separately.
+- Quota projection isolates provider, anonymous account, quota-window and reset-cycle series; isolated one-sample spikes are removed and material capacity increases begin a new trend segment.
+- Quota projection requires at least five samples, the documented 30-minute short-window or 6-hour long-window coverage, sufficient sample density and a bounded maximum gap before producing an estimate.
+- Robust recency-weighted trends handle idle, smooth, recently changing and bursty usage; distant forecasts shrink toward the broader trend instead of extending a short burst unchanged.
+- Projection ranges include fit, holdout, discrete-event timing and behavioral pace error; bursty usage produces a wider range and an error above 20 percentage points suppresses the estimate.
+- Multiple windows select the lowest projected lower bound, and outcomes distinguish remaining at reset, possible exhaustion and likely exhaustion.
+- Quota projection fails closed without loading history when current Official quota fails, and explains missing reset timing or history storage separately.
 - Codex OAuth/RPC rate limit snapshots map into official provider bars.
 - Codex adapter returns an error when OAuth/RPC sources exceed the adapter-level official sync timeout.
 - Codex adapter retries a transient official transport failure once inside the same bounded refresh, has enough default budget for two complete source attempts, and records when that retry recovered current official data.
@@ -170,10 +172,10 @@
 - Confirm Codex reads usage automatically when `~/.codex/auth.json` or the Codex CLI RPC source is available.
 - After two eligible Codex refreshes at least five minutes apart, confirm `quota-observations-v1.jsonl` contains scalar samples only and does not contain the visible account email, access token or response text.
 - Temporarily make the Codex official refresh fail after a successful sample and confirm current quota reports the error rather than reading history as fallback.
-- Confirm Overview shows a compact Codex Capacity Weather row and the Codex page shows the full Headroom card without adding weather to the menu-bar icon.
-- With insufficient same-cycle history, confirm both surfaces say `Learning` and label the forecast `Unavailable` rather than guessing a pace.
-- With sufficient history, confirm the weather is Clear, Windy or Storm, the full card shows projected headroom plus recent sample coverage, and every forecast is labeled `Estimated`.
-- Temporarily make the current Codex official refresh fail after an Estimated forecast exists and confirm Capacity Weather immediately becomes Fog while the old forecast is not displayed as current.
+- Confirm Overview and the Codex page show the same compact Quota projection card without adding prediction state to the menu-bar icon.
+- With insufficient same-cycle history, confirm both surfaces say that more history is being collected and label the projection `Unavailable` rather than guessing a pace.
+- With sufficient continuous history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label.
+- Temporarily make the current Codex official refresh fail after an Estimated projection exists and confirm the card immediately becomes `Unavailable` while the old projection is not displayed as current.
 - Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
 - Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.
 - Confirm Codex `Today local tokens`, `30d local tokens`, `Latest local tokens`, `Top local model`, and hourly activity use reported `total_tokens`; each token card shows one total and a cached-input percentage, with no local USD or credit estimate.

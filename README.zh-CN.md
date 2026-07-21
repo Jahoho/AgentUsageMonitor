@@ -27,7 +27,7 @@ Agent Usage Monitor 通过紧凑的原生 macOS 界面，集中展示日常 AI �
 
 | Provider | 当前显示内容 | 数据来源 |
 | --- | --- | --- |
-| Codex | 当前额度、重置时间、reset credits，以及本地估算的 Headroom / Capacity Weather | 当前官方 ChatGPT Codex API 或 Codex CLI RPC；预测使用经过隐私隔离的本地官方样本 |
+| Codex | 当前额度、重置时间、reset credits，以及紧凑的本地额度预测 | 当前官方 ChatGPT Codex API 或 Codex CLI RPC；预测使用经过隐私隔离的本地官方样本 |
 | Codex activity | 今日、滚动 30 天和每小时本地 Token 活动 | 本地 Codex session 日志中的明确用量字段 |
 | Claude | Claude Code 安装状态和官方用量入口 | 本地 CLI 可用性；准确额度暂不可用 |
 | DeepSeek | 账户余额 | 官方 `/user/balance` API |
@@ -108,7 +108,7 @@ Swift Package 分为两层：
 - 应用尚未针对第三方二进制分发完成签名和 Apple 公证。
 - 当前 Claude adapter 无法提供准确的订阅额度。
 - Codex 本地 Token activity 是观测遥测，不是官方账户账单总量。
-- Codex Headroom 需要同一重置周期内有足够的官方历史后才能预测；短周期至少需要 30 分钟覆盖，长周期至少需要 6 小时覆盖。
+- Codex 额度预测至少需要同一重置周期内 5 个连续 Official 样本；短周期至少覆盖 30 分钟，长周期至少覆盖 6 小时。历史过于稀疏或趋势不稳定时会保持 Unavailable。
 - DeepSeek 历史 activity 只包含经过本应用代理的请求。
 - OpenRouter Token activity 需要 Management Key，并且只反映官方 API 返回的记录。
 

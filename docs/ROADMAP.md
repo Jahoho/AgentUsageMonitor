@@ -15,12 +15,12 @@ The roadmap is intentionally conservative. New surfaces are accepted only when t
 Delivered foundations:
 
 - Local, privacy-scoped history from current official quota samples without a fallback path.
-- Headroom and Capacity Weather from recent official samples, with every forecast labeled Estimated and insufficient data shown honestly.
+- A compact quota projection from recent Official samples, with a remaining range, explicit Estimated labeling, and honest suppression of sparse or unstable results.
 
 Next:
 
 - Add a Codex weekly subscription review aligned to the official weekly reset cycle, including coverage and previous-cycle comparison.
-- Keep notifications, menu-bar weather and plan recommendations out of the first iteration until forecast quality is proven.
+- Keep notifications, menu-bar projection status and plan recommendations out of the first iteration until forecast quality is proven.
 
 ## v0.3 - Trusted Binary Distribution
 

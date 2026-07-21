@@ -27,7 +27,7 @@ The initial public release is source-first. The repository is ready to build and
 
 | Provider | Current usage surface | Data source |
 | --- | --- | --- |
-| Codex | Current quota, reset timing, reset credits, and locally estimated Headroom / Capacity Weather | Current official ChatGPT Codex API or Codex CLI RPC; forecasts use privacy-scoped local official samples |
+| Codex | Current quota, reset timing, reset credits, and a compact local quota projection | Current official ChatGPT Codex API or Codex CLI RPC; projections use privacy-scoped local official samples |
 | Codex activity | Today, rolling 30-day and hourly local token activity | Observed fields from local Codex session logs |
 | Claude | Claude Code installation status and official usage entry points | Local CLI availability; exact quota remains unavailable |
 | DeepSeek | Account balance | Official `/user/balance` API |
@@ -108,7 +108,7 @@ Start with the [Documentation Index](docs/README.md), [Architecture](docs/ARCHIT
 - The app is not signed or notarized for third-party binary distribution.
 - Claude does not expose exact subscription quota in the current adapter.
 - Codex local token activity is observed telemetry, not an official account billing total.
-- Codex Headroom needs enough same-cycle official history before it can forecast; short windows require at least 30 minutes and long windows require at least 6 hours of coverage.
+- Codex quota projection needs at least five continuous same-cycle Official samples; short windows require 30 minutes of coverage and long windows require 6 hours. Sparse or unstable history remains Unavailable.
 - DeepSeek historical activity includes only requests that pass through this app's proxy.
 - OpenRouter token activity requires a management key and only reflects records returned by the official API.
 

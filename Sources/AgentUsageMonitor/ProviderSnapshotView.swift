@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ProviderSnapshotView: View {
     let snapshot: ProviderSnapshot
-    let capacityInsight: CapacityInsight?
+    let quotaProjection: QuotaProjection?
     let openAction: (ProviderAction) -> Void
 
     var body: some View {
@@ -23,7 +23,7 @@ struct ProviderSnapshotView: View {
             }
 
             if snapshot.id == "codex" {
-                CapacityWeatherCard(snapshot: snapshot, insight: capacityInsight)
+                QuotaProjectionCard(snapshot: snapshot, projection: quotaProjection)
             }
 
             if snapshot.metrics.isEmpty == false {
