@@ -35,7 +35,7 @@ The menu UI follows the same split:
 - `DashboardView`: fixed-width, content-measured popover shell, one bounded root scroll surface, and selected page routing.
 - `HeaderView`, `BrandIconView`, and `BrandLogoStore`: top navigation and bundled logo rendering.
 - `ApplicationMenu`: standard AppKit responder-chain commands for Undo, Cut, Copy, Paste, and Select All in the accessory-style menu bar app.
-- `OverviewView`: active-agent summary, compact quota projection, all-provider activity aggregation, and concise provider source health.
+- `OverviewView`: active-agent summary, compact quota projection, expandable weekly review, all-provider activity aggregation, and concise provider source health.
 - `ProviderSnapshotView`, `QuotaProjectionView`, `UsageViews`, and `ActivityStrip`: provider pages, quota projection, quota bars, metric tiles, account selection, model rows, and hourly/daily activity charts.
 - `SettingsView`: credentials, login shortcuts, proxy endpoint, and app controls.
 - `LaunchAtLoginController`: thin wrapper around `SMAppService.mainApp` that exposes readable state for SwiftUI and preserves macOS approval/error messages.
@@ -43,7 +43,7 @@ The menu UI follows the same split:
 - `OpenRouterCredentialStore`: non-secret OpenRouter key metadata in Application Support plus per-key secrets in Keychain, including safe migration from the legacy single-key item.
 - `HTTPRequestParser`: bounded local HTTP request parsing for the DeepSeek proxy, including strict origin-form targets and case-insensitive singleton-header validation.
 - `JSONUsageEventStore`: append-only JSONL usage event storage with legacy JSON array migration.
-- `QuotaProjectionService` and `QuotaObservationStore`: capture eligible current Official quota samples, load protected local JSONL history, and publish a separate derived `QuotaProjection` model.
+- `QuotaProjectionService` and `QuotaObservationStore`: capture eligible current Official quota samples, load protected local JSONL history, and publish separate derived projection and weekly-review models.
 
 ## Data Confidence
 
@@ -112,6 +112,16 @@ The analyzer applies monotonic normalization and a Huber-weighted linear fit. Sh
 Modeled error above 20 percentage points is normally suppressed as unstable. A long projection survives that threshold only when even its upper bound reaches zero before reset; this preserves a stable qualitative exhaustion result while the UI omits a specific exhaustion time.
 
 The compact card shows the range when it stays above zero, possible exhaustion when it crosses zero, or likely exhaustion when the whole range is at or below zero. An approximate exhaustion time appears only when modeled error is at most 20 percentage points. Displayed results are always `Estimated`; missing, sparse or unstable inputs are `Unavailable`. With multiple Official windows, the lowest valid lower bound becomes the constraining projection. If current Official quota is unavailable, `QuotaProjectionService` returns `Unavailable` before loading history. Previous samples are never used to synthesize a current value.
+
+## Weekly Subscription Review
+
+The Overview-only weekly review reuses the same protected scalar quota history and does not add a second persistence path. Codex windows are identified by the official duration when it is available, so a weekly-only source exposed as `primary` is still labeled `codex-weekly`. Older history that labeled a long primary window as `codex-session` is normalized only in memory when its reset lead proves it cannot be the five-hour window; the JSONL file is not rewritten.
+
+`WeeklySubscriptionReviewAnalyzer` segments weekly observations when remaining capacity materially refills, while reset-time adjustments without a refill stay in the same cycle. A current summary needs at least two samples spanning 30 minutes. It reports the exact decrease observed in Official samples, the observed duration, and sample coverage against the five-minute capture interval. The UI labels this local retrospective as `Observed`, never `Official` or `Estimated`.
+
+The card calls usage “cycle to date” only when history begins near full capacity and includes a reset lead of at least six days. Otherwise it says that the value covers only the observed span. Previous-cycle comparison uses the nearest sample at the same elapsed point from the observed cycle start and requires both cycles to start near full capacity plus a match within two hours. Missing coverage remains explicit; the first version does not extrapolate a whole cycle, recommend a plan, send notifications, or affect the menu-bar icon.
+
+The review fails closed before history is loaded when current Official quota or its anonymous account scope is unavailable. It cannot populate a current quota bar, change provider health, or act as a fallback.
 
 ## Codex Subscription Strategy
 

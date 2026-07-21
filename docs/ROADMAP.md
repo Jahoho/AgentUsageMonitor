@@ -16,10 +16,10 @@ Delivered foundations:
 
 - Local, privacy-scoped history from current official quota samples without a fallback path.
 - A compact quota projection from recent Official samples, with a remaining range, explicit Estimated labeling, and honest suppression of sparse or unstable results.
+- An Overview-only expandable weekly subscription review with Observed cycle use, explicit coverage, and previous-cycle comparison at the same progress point.
 
-Next:
+Guardrails:
 
-- Add a Codex weekly subscription review aligned to the official weekly reset cycle, including coverage and previous-cycle comparison.
 - Keep notifications, menu-bar projection status and plan recommendations out of the first iteration until forecast quality is proven.
 
 ## v0.3 - Trusted Binary Distribution

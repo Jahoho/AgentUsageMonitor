@@ -36,6 +36,25 @@ import Testing
     #expect(CodexRateLimitWindow(usedPercent: 125, windowMinutes: nil, resetsAt: nil).usedPercent == 100)
 }
 
+@Test func codexRateLimitFactoryUsesOfficialDurationForWeeklyOnlyPrimaryWindow() {
+    let now = Date(timeIntervalSince1970: 1_704_067_200)
+    let rateLimits = CodexRateLimitSnapshot(
+        primary: CodexRateLimitWindow(
+            usedPercent: 40,
+            windowMinutes: 10_080,
+            resetsAt: now.addingTimeInterval(604_800)
+        ),
+        secondary: nil,
+        source: "OAuth API",
+        updatedAt: now
+    )
+
+    let snapshot = CodexRateLimitSnapshotFactory.providerSnapshot(from: rateLimits)
+
+    #expect(snapshot.bars.map(\.id) == ["codex-weekly"])
+    #expect(snapshot.bars.first?.label == "Weekly")
+}
+
 @Test func codexRateLimitSnapshotFormatsResetTimeFromSnapshotUpdateTime() {
     let updatedAt = Date(timeIntervalSince1970: 1_704_067_200)
     let resetsAt = updatedAt.addingTimeInterval(3_600)

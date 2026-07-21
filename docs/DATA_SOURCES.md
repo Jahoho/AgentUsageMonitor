@@ -19,6 +19,7 @@ An `Official` label describes the source of a value. It does not imply that the 
 | --- | --- | --- | --- |
 | Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Eligible scalar samples may be retained locally for analysis, but previous official quota is never used as fallback. |
 | Codex quota projection | Recent same-account, same-window and same-reset-cycle Official quota samples | Estimated when reliable; otherwise Unavailable | Requires at least five samples plus 30 continuous minutes for short windows or 6 hours of sufficiently dense coverage for long windows. Normal long-window sampling gaps widen uncertainty instead of invalidating all history. Never supplies current quota. |
+| Codex weekly review | Same-account Official weekly quota samples retained locally | Observed when the current cycle has enough history; otherwise Unavailable | Reports only captured change and coverage. Previous-cycle comparison requires comparable start coverage and a same-progress sample; it never extrapolates a full week or supplies current quota. |
 | Codex reset credits | Official reset-credit API or CLI RPC fields | Official | Expiry appears only when the source exposes an explicit date. No 30-day rule is inferred. |
 | Codex token activity | Explicit token counters in local live and archived session logs | Observed | Rolling 30x24-hour history after duplicate, replay and future-event filtering. Never populates quota bars. |
 | Claude subscription | Local Claude Code availability and user-opened official usage surface | Unavailable for exact quota | No scraping, local estimate or stale quota fallback. |
@@ -57,7 +58,15 @@ Modeled error above 20 percentage points normally remains `Unavailable`. The str
 
 When the entire range stays above zero, the card shows the percentage expected to remain at reset. If the range crosses zero, it says the quota may run out; if the entire range is at or below zero, it shows expected exhaustion and includes an approximate time only when modeled error is at most 20 percentage points. Every displayed projection is `Estimated`. With multiple windows, the valid projection with the lowest lower bound is shown.
 
-History cannot populate current Official bars, change provider health or hide a failed Official refresh. In particular, a current Official failure becomes `Unavailable` before history is loaded; no stale sample is treated as present capacity. The same history may later support the separately documented weekly subscription review.
+History cannot populate current Official bars, change provider health or hide a failed Official refresh. In particular, a current Official failure becomes `Unavailable` before history is loaded; no stale sample is treated as present capacity. The same history also supports the separately documented weekly subscription review.
+
+## Weekly Subscription Review
+
+The weekly review is derived from the same protected scalar history. Official window duration takes priority over primary/secondary source position when assigning the Session or Weekly id. Legacy long-primary observations are interpreted as weekly only in memory when their reset lead exceeds one day; the stored file remains unchanged.
+
+A material capacity refill starts a new observed cycle. Reset-time movement on its own does not create a fake cycle. The current summary requires two samples spanning at least 30 minutes and reports observed quota decrease, observed duration and density against the five-minute capture schedule. It claims cycle-to-date coverage only when capture began near full capacity with at least six days of reset lead; otherwise the wording is limited to the observed span.
+
+Comparison uses the previous observed cycle at the same elapsed progress point. Both cycles must begin near full capacity, and the previous sample must be within two hours of the target. When those conditions are not met, the Overview card says comparison is still being collected. No unobserved time is filled with zero usage or a predicted pace.
 
 ## Adding A Provider
 

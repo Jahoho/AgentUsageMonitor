@@ -50,16 +50,20 @@ public struct CodexRateLimitSnapshot: Codable, Equatable, Sendable {
 }
 
 public enum CodexRateLimitSnapshotFactory {
+    private static let sessionWindowMinutes = 300
+    private static let weeklyWindowMinutes = 10_080
+
     public static func providerSnapshot(from snapshot: CodexRateLimitSnapshot) -> ProviderSnapshot {
-        var bars: [UsageBar] = []
-
-        if let primary = snapshot.primary {
-            bars.append(usageBar(id: "codex-session", label: "Session", window: primary, updatedAt: snapshot.updatedAt))
-        }
-
-        if let secondary = snapshot.secondary {
-            bars.append(usageBar(id: "codex-weekly", label: "Weekly", window: secondary, updatedAt: snapshot.updatedAt))
-        }
+        let bars = identifiedWindows(in: snapshot)
+            .sorted { windowRank($0.id) < windowRank($1.id) }
+            .map { identified in
+                usageBar(
+                    id: identified.id,
+                    label: identified.label,
+                    window: identified.window,
+                    updatedAt: snapshot.updatedAt
+                )
+            }
 
         var metrics = [
             UsageMetric(
@@ -153,6 +157,43 @@ public enum CodexRateLimitSnapshotFactory {
             resetAt: window.resetsAt,
             confidence: .official
         )
+    }
+
+    /// Official sources can expose a weekly-only window as `primary`.
+    /// Prefer the explicit duration and use source position only for older schemas.
+    private static func identifiedWindows(
+        in snapshot: CodexRateLimitSnapshot
+    ) -> [(id: String, label: String, window: CodexRateLimitWindow)] {
+        var identified: [(id: String, label: String, window: CodexRateLimitWindow)] = []
+
+        if let primary = snapshot.primary {
+            identified.append(identifiedWindow(primary, fallbackID: "codex-session", fallbackLabel: "Session"))
+        }
+        if let secondary = snapshot.secondary {
+            identified.append(identifiedWindow(secondary, fallbackID: "codex-weekly", fallbackLabel: "Weekly"))
+        }
+
+        var seenIDs: Set<String> = []
+        return identified.filter { seenIDs.insert($0.id).inserted }
+    }
+
+    private static func identifiedWindow(
+        _ window: CodexRateLimitWindow,
+        fallbackID: String,
+        fallbackLabel: String
+    ) -> (id: String, label: String, window: CodexRateLimitWindow) {
+        switch window.windowMinutes {
+        case sessionWindowMinutes:
+            return ("codex-session", "Session", window)
+        case weeklyWindowMinutes:
+            return ("codex-weekly", "Weekly", window)
+        default:
+            return (fallbackID, fallbackLabel, window)
+        }
+    }
+
+    private static func windowRank(_ id: String) -> Int {
+        id == "codex-session" ? 0 : 1
     }
 
     private static func friendlyPlanName(_ plan: String?) -> String? {

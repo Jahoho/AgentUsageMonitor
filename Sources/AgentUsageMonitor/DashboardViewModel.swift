@@ -24,6 +24,7 @@ final class DashboardViewModel: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var menuBarStatus = MenuBarStatusFactory.snapshot(from: [])
     @Published private(set) var quotaProjections: [String: QuotaProjection] = [:]
+    @Published private(set) var weeklySubscriptionReviews: [String: WeeklySubscriptionReview] = [:]
     @Published var deepSeekAPIKeyLabelInput = ""
     @Published var deepSeekAPIKeyInput = ""
     @Published var settingsMessage = ""
@@ -106,25 +107,38 @@ final class DashboardViewModel: ObservableObject {
                     reason: reason,
                     generatedAt: now
                 )
-            } else if let existing = quotaProjections["codex"],
-                      quotaProjectionMatchesCurrentQuota(existing, snapshot: currentCodex) == false {
-                quotaProjections.removeValue(forKey: "codex")
+                weeklySubscriptionReviews["codex"] = WeeklySubscriptionReview.unavailable(
+                    providerID: "codex",
+                    reason: QuotaProjectionService.weeklyReviewAvailabilityReason(for: reason),
+                    generatedAt: now
+                )
+            } else {
+                if let existing = quotaProjections["codex"],
+                   quotaProjectionMatchesCurrentQuota(existing, snapshot: currentCodex) == false {
+                    quotaProjections.removeValue(forKey: "codex")
+                }
+                if let existingReview = weeklySubscriptionReviews["codex"],
+                   weeklyReviewMatchesCurrentQuota(existingReview, snapshot: currentCodex) == false {
+                    weeklySubscriptionReviews.removeValue(forKey: "codex")
+                }
             }
         } else {
             quotaProjections.removeValue(forKey: "codex")
+            weeklySubscriptionReviews.removeValue(forKey: "codex")
         }
 
         quotaProjectionTask?.cancel()
         let quotaProjectionProvider = quotaProjectionProvider
         quotaProjectionTask = Task { [weak self] in
-            let projections = await quotaProjectionProvider.refreshProjections(
+            let result = await quotaProjectionProvider.refreshProjections(
                 from: currentSnapshots,
                 now: now
             )
             guard Task.isCancelled == false else {
                 return
             }
-            self?.quotaProjections = projections
+            self?.quotaProjections = result.projections
+            self?.weeklySubscriptionReviews = result.weeklyReviews
         }
     }
 
@@ -141,6 +155,21 @@ final class DashboardViewModel: ObservableObject {
                 return false
             }
             return abs(currentReset.timeIntervalSince(window.resetAt)) <= 5 * 60
+        }
+    }
+
+    private func weeklyReviewMatchesCurrentQuota(
+        _ review: WeeklySubscriptionReview,
+        snapshot: ProviderSnapshot
+    ) -> Bool {
+        guard let reviewResetAt = review.currentCycle?.resetAt else {
+            return false
+        }
+        return snapshot.bars.contains { bar in
+            guard let currentResetAt = bar.resetAt else {
+                return false
+            }
+            return abs(currentResetAt.timeIntervalSince(reviewResetAt)) <= 5 * 60
         }
     }
 
