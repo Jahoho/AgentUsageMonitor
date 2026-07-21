@@ -52,9 +52,10 @@
 - Quota history limits an unchanged reset cycle to one sample every five minutes, captures a new reset cycle immediately, retains approximately 90 days and compacts malformed or expired JSONL rows.
 - Quota-history files use `0600` permissions inside an app-owned `0700` directory.
 - Quota projection isolates provider, anonymous account, quota-window and reset-cycle series; isolated one-sample spikes are removed and material capacity increases begin a new trend segment.
-- Quota projection requires at least five samples, the documented 30-minute short-window or 6-hour long-window coverage, sufficient sample density and a bounded maximum gap before producing an estimate.
-- Robust recency-weighted trends handle idle, smooth, recently changing and bursty usage; distant forecasts shrink toward the broader trend instead of extending a short burst unchanged.
-- Projection ranges include fit, holdout, discrete-event timing and behavioral pace error; bursty usage produces a wider range and an error above 20 percentage points suppresses the estimate.
+- Quota projection requires at least five samples, the documented 30-minute short-window or 6-hour long-window coverage and sufficient sample density. Short windows still reject gaps above 45 minutes.
+- Long windows preserve their broad elapsed-time trend across normal overnight gaps, start recent pace after the latest gap above 4 hours, and distribute cross-gap quota movement across the elapsed activity buckets.
+- Robust trends handle idle, smooth, recently changing and bursty usage; distant forecasts anchor to calendar-time average pace instead of extending one active period unchanged.
+- Projection ranges include fit, holdout, discrete-event timing and behavioral pace error. Error above 20 percentage points normally suppresses the estimate, except when an entire long-window range still predicts exhaustion before reset.
 - Multiple windows select the lowest projected lower bound, and outcomes distinguish remaining at reset, possible exhaustion and likely exhaustion.
 - Quota projection fails closed without loading history when current Official quota fails, and explains missing reset timing or history storage separately.
 - Codex OAuth/RPC rate limit snapshots map into official provider bars.
@@ -174,7 +175,7 @@
 - Temporarily make the Codex official refresh fail after a successful sample and confirm current quota reports the error rather than reading history as fallback.
 - Confirm Overview and the Codex page show the same compact Quota projection card without adding prediction state to the menu-bar icon.
 - With insufficient same-cycle history, confirm both surfaces say that more history is being collected and label the projection `Unavailable` rather than guessing a pace.
-- With sufficient continuous history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label.
+- With sufficient history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label. A wide but uniformly exhausted long-window range must omit the specific exhaustion time.
 - Temporarily make the current Codex official refresh fail after an Estimated projection exists and confirm the card immediately becomes `Unavailable` while the old projection is not displayed as current.
 - Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
 - Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.

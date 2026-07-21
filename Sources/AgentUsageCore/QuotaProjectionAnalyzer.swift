@@ -15,8 +15,7 @@ public enum QuotaProjectionAnalyzer {
     private static let expectedSampleInterval: TimeInterval = 5 * 60
     private static let minimumSampleCoverage = 0.15
     private static let shortMaximumGap: TimeInterval = 45 * 60
-    private static let longMaximumGap: TimeInterval = 4 * 60 * 60
-    private static let maximumForecastError = 0.20
+    private static let longRecentContinuityGap: TimeInterval = 4 * 60 * 60
     private static let minimumForecastError = 0.01
 
     public static func analyze(
@@ -105,10 +104,16 @@ public enum QuotaProjectionAnalyzer {
             )
         }
 
-        let maximumAllowedGap = isLongWindow ? longMaximumGap : shortMaximumGap
-        guard sampleCoverage >= minimumSampleCoverage,
-              maximumGap(in: selectedPoints) <= maximumAllowedGap
-        else {
+        guard sampleCoverage >= minimumSampleCoverage else {
+            return unavailableWindow(
+                current: current,
+                points: selectedPoints,
+                sampleCoverage: sampleCoverage,
+                reason: .sparseHistory
+            )
+        }
+        if isLongWindow == false,
+           maximumGap(in: selectedPoints) > shortMaximumGap {
             return unavailableWindow(
                 current: current,
                 points: selectedPoints,
@@ -127,24 +132,36 @@ public enum QuotaProjectionAnalyzer {
             )
         }
 
-        let fullRate = max(0, -fullFit.slope)
+        let fittedRate = max(0, -fullFit.slope)
+        let broadRate = isLongWindow
+            ? elapsedConsumptionRate(points: trendPoints) ?? fittedRate
+            : fittedRate
+        let recentTrendPoints = isLongWindow
+            ? pointsAfterLastGap(
+                in: trendPoints,
+                maximumGap: longRecentContinuityGap
+            )
+            : trendPoints
         let recentRate = recentConsumptionRate(
-            points: trendPoints,
+            points: recentTrendPoints,
             isLongWindow: isLongWindow
         )
         let remainingHours = max(0, current.resetAt.timeIntervalSince(now) / 3_600)
         let consumptionRate: Double
-        let paceShift: Double
+        let weightedPaceShift: Double
         if let recentRate {
             // A short forecast can react quickly to a burst. Farther forecasts
             // shrink toward the broader trend instead of extending one burst.
-            let recentWeight = max(0.2, min(0.65, 0.65 / sqrt(max(1, remainingHours))))
+            let distanceAdjustedWeight = 0.65 / sqrt(max(1, remainingHours))
+            let recentWeight = isLongWindow
+                ? min(0.65, distanceAdjustedWeight)
+                : max(0.2, min(0.65, distanceAdjustedWeight))
             consumptionRate = (recentRate * recentWeight)
-                + (fullRate * (1 - recentWeight))
-            paceShift = abs(recentRate - fullRate)
+                + (broadRate * (1 - recentWeight))
+            weightedPaceShift = abs(recentRate - broadRate) * recentWeight
         } else {
-            consumptionRate = fullRate
-            paceShift = 0
+            consumptionRate = broadRate
+            weightedPaceShift = 0
         }
 
         let validationError = holdoutValidationError(
@@ -152,7 +169,7 @@ public enum QuotaProjectionAnalyzer {
             isLongWindow: isLongWindow
         ) ?? 0
         let projectedRemaining = current.remainingFraction - (consumptionRate * remainingHours)
-        let rateError = max(fullFit.slopeStandardError * 1.64, paceShift * 0.5)
+        let rateError = max(fullFit.slopeStandardError * 1.64, weightedPaceShift * 0.5)
         let fitError = max(fullFit.medianAbsoluteResidual * 1.64, validationError)
         let processError = consumptionProcessError(
             points: trendPoints,
@@ -165,8 +182,14 @@ public enum QuotaProjectionAnalyzer {
             fitError + (rateError * remainingHours),
             processError
         )
+        let lowerBound = max(-1, projectedRemaining - forecastError)
+        let upperBound = min(current.remainingFraction, projectedRemaining + forecastError)
+        let stableLongExhaustion = isLongWindow && upperBound <= 0
 
-        guard forecastError <= maximumForecastError else {
+        guard forecastError.isFinite,
+              forecastError <= QuotaWindowProjection.maximumPreciseForecastError
+                || stableLongExhaustion
+        else {
             return unavailableWindow(
                 current: current,
                 points: selectedPoints,
@@ -175,8 +198,6 @@ public enum QuotaProjectionAnalyzer {
             )
         }
 
-        let lowerBound = max(-1, projectedRemaining - forecastError)
-        let upperBound = min(current.remainingFraction, projectedRemaining + forecastError)
         let exhaustionAt: Date? = consumptionRate > 0
             ? now.addingTimeInterval((current.remainingFraction / consumptionRate) * 3_600)
             : nil
@@ -407,6 +428,21 @@ public enum QuotaProjectionAnalyzer {
         return max(0, -fit.slope)
     }
 
+    /// Long-window pace is anchored to elapsed calendar time so normal idle
+    /// periods, including overnight gaps, remain part of the weekly baseline.
+    private static func elapsedConsumptionRate(points: [TrendPoint]) -> Double? {
+        guard let first = points.first,
+              let last = points.last
+        else {
+            return nil
+        }
+        let elapsedHours = last.capturedAt.timeIntervalSince(first.capturedAt) / 3_600
+        guard elapsedHours > 0 else {
+            return nil
+        }
+        return max(0, (first.remainingFraction - last.remainingFraction) / elapsedHours)
+    }
+
     /// Quota sources often move in discrete steps rather than continuously.
     /// Treating those steps as recurring events gives the range room for
     /// ordinary burst timing without changing the point estimate.
@@ -435,9 +471,26 @@ public enum QuotaProjectionAnalyzer {
             guard drop > 0 else {
                 continue
             }
-            let age = max(0, latest.timeIntervalSince(next.capturedAt))
-            let bucketIndex = min(bucketCount - 1, Int(age / bucketDuration))
-            bucketConsumption[bucketIndex] += drop
+            let newerAge = max(0, latest.timeIntervalSince(next.capturedAt))
+            let olderAge = max(newerAge, latest.timeIntervalSince(previous.capturedAt))
+            let newerBucket = min(bucketCount - 1, Int(newerAge / bucketDuration))
+            let intervalDuration = olderAge - newerAge
+            guard intervalDuration > 0 else {
+                bucketConsumption[newerBucket] += drop
+                continue
+            }
+
+            let oldestIncludedAge = max(newerAge, olderAge.nextDown)
+            let olderBucket = min(bucketCount - 1, Int(oldestIncludedAge / bucketDuration))
+            for bucketIndex in newerBucket...olderBucket {
+                let bucketStart = Double(bucketIndex) * bucketDuration
+                let bucketEnd = bucketStart + bucketDuration
+                let overlap = max(
+                    0,
+                    min(olderAge, bucketEnd) - max(newerAge, bucketStart)
+                )
+                bucketConsumption[bucketIndex] += drop * (overlap / intervalDuration)
+            }
         }
 
         let meanBucketConsumption = bucketConsumption.reduce(0, +)
@@ -456,15 +509,17 @@ public enum QuotaProjectionAnalyzer {
         let eventTimingError = 1.28
             * sqrt(projectedConsumption * typicalStep * dispersion)
 
-        // Adjacent activity buckets are not fully independent: work tends to
-        // happen in sessions. Use half the bucket count as the effective sample
-        // size when estimating how much the average pace itself may move.
+        // Fit and holdout errors already scale average-rate uncertainty across
+        // the full forecast. Session timing varies inside a day, so this
+        // separate behavioral term is capped at one daily cycle instead of
+        // extending one day's hour-to-hour variance across several days.
         let bucketHours = bucketDuration / 3_600
         let effectiveBucketCount = max(1, Double(bucketConsumption.count) / 2)
         let paceStandardError = sqrt(bucketVariance)
             / bucketHours
             / sqrt(effectiveBucketCount)
-        let behavioralPaceError = 1.28 * paceStandardError * remainingHours
+        let behavioralHorizon = min(remainingHours, 24)
+        let behavioralPaceError = 1.28 * paceStandardError * behavioralHorizon
         return eventTimingError + behavioralPaceError
     }
 
@@ -518,6 +573,27 @@ public enum QuotaProjectionAnalyzer {
                 max(0, next.capturedAt.timeIntervalSince(current.capturedAt))
             }
             .max() ?? .infinity
+    }
+
+    /// Long quota windows commonly contain an overnight sampling gap. The
+    /// endpoints still describe total quota movement and remain useful for the
+    /// broad trend, but recent pace must not bridge that unobserved interval.
+    private static func pointsAfterLastGap(
+        in points: [TrendPoint],
+        maximumGap: TimeInterval
+    ) -> [TrendPoint] {
+        guard points.count > 1 else {
+            return points
+        }
+
+        var segmentStart = 0
+        for index in 1..<points.count {
+            let gap = points[index].capturedAt.timeIntervalSince(points[index - 1].capturedAt)
+            if gap > maximumGap {
+                segmentStart = index
+            }
+        }
+        return Array(points[segmentStart...])
     }
 
     private static func sampleCoverageFraction(

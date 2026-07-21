@@ -17,6 +17,8 @@ public enum QuotaProjectionOutcome: String, Sendable {
 }
 
 public struct QuotaWindowProjection: Identifiable, Equatable, Sendable {
+    public static let maximumPreciseForecastError = 0.20
+
     public var id: String { quotaID }
 
     public let quotaID: String

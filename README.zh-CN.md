@@ -108,7 +108,7 @@ Swift Package 分为两层：
 - 应用尚未针对第三方二进制分发完成签名和 Apple 公证。
 - 当前 Claude adapter 无法提供准确的订阅额度。
 - Codex 本地 Token activity 是观测遥测，不是官方账户账单总量。
-- Codex 额度预测至少需要同一重置周期内 5 个连续 Official 样本；短周期至少覆盖 30 分钟，长周期至少覆盖 6 小时。历史过于稀疏或趋势不稳定时会保持 Unavailable。
+- Codex 额度预测至少需要同一重置周期内 5 个 Official 样本；短周期需要连续覆盖 30 分钟，长周期需要累计 6 小时且样本密度足够。正常的隔夜空档只会扩大不确定区间，不会让全部历史失效。
 - DeepSeek 历史 activity 只包含经过本应用代理的请求。
 - OpenRouter Token activity 需要 Management Key，并且只反映官方 API 返回的记录。
 
