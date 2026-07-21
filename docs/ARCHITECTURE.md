@@ -35,8 +35,8 @@ The menu UI follows the same split:
 - `DashboardView`: fixed-width, content-measured popover shell, one bounded root scroll surface, and selected page routing.
 - `HeaderView`, `BrandIconView`, and `BrandLogoStore`: top navigation and bundled logo rendering.
 - `ApplicationMenu`: standard AppKit responder-chain commands for Undo, Cut, Copy, Paste, and Select All in the accessory-style menu bar app.
-- `OverviewView`: active-agent summary, compact quota projection, expandable weekly review, all-provider activity aggregation, and concise provider source health.
-- `ProviderSnapshotView`, `QuotaProjectionView`, `UsageViews`, and `ActivityStrip`: provider pages, quota projection, quota bars, metric tiles, account selection, model rows, and hourly/daily activity charts.
+- `OverviewView`: active-agent summary, expandable weekly review, all-provider activity aggregation, and concise provider source health.
+- `ProviderSnapshotView`, `QuotaProjectionView`, `UsageViews`, and `ActivityStrip`: provider pages, quota projection for explicitly eligible subscription Coding Plans, quota bars, metric tiles, account selection, model rows, and hourly/daily activity charts. Direct-billed API providers never render the projection card.
 - `SettingsView`: credentials, login shortcuts, proxy endpoint, and app controls.
 - `LaunchAtLoginController`: thin wrapper around `SMAppService.mainApp` that exposes readable state for SwiftUI and preserves macOS approval/error messages.
 - `DeepSeekCredentialStore`: non-secret DeepSeek key metadata in Application Support plus per-key secrets in Keychain.

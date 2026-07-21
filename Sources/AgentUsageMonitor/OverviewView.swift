@@ -5,7 +5,6 @@ import SwiftUI
 struct OverviewView: View {
     let snapshot: ProviderSnapshot
     let providerSnapshots: [ProviderSnapshot]
-    let quotaProjections: [String: QuotaProjection]
     let weeklySubscriptionReviews: [String: WeeklySubscriptionReview]
 
     private var activeAgent: OverviewActiveAgent? {
@@ -19,11 +18,6 @@ struct OverviewView: View {
             ActiveAgentPanel(agent: activeAgent)
 
             if let codexSnapshot = providerSnapshots.first(where: { $0.id == "codex" }) {
-                QuotaProjectionCard(
-                    snapshot: codexSnapshot,
-                    projection: quotaProjections[codexSnapshot.id]
-                )
-
                 WeeklySubscriptionReviewCard(
                     snapshot: codexSnapshot,
                     review: weeklySubscriptionReviews[codexSnapshot.id]

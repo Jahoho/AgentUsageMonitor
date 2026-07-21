@@ -22,6 +22,7 @@ struct ProviderRegistration: Identifiable, Equatable, Sendable {
     let id: String
     let displayName: String
     let kind: ProviderKind
+    let supportsQuotaProjection: Bool
     let navigation: ProviderNavigationMetadata
     let freshnessPolicy: ProviderSnapshotFreshnessPolicy
 }
@@ -31,6 +32,7 @@ extension ProviderRegistration {
         id: "codex",
         displayName: "Codex",
         kind: .subscription,
+        supportsQuotaProjection: true,
         navigation: ProviderNavigationMetadata(
             title: "Codex",
             icon: .brand(resourceName: "codex")
@@ -42,6 +44,7 @@ extension ProviderRegistration {
         id: "claude",
         displayName: "Claude",
         kind: .subscription,
+        supportsQuotaProjection: false,
         navigation: ProviderNavigationMetadata(
             title: "Claude",
             icon: .brand(resourceName: "claude")
@@ -53,6 +56,7 @@ extension ProviderRegistration {
         id: "deepseek",
         displayName: "DeepSeek",
         kind: .api,
+        supportsQuotaProjection: false,
         navigation: ProviderNavigationMetadata(
             title: "DeepSeek",
             icon: .brand(resourceName: "deepseek")
@@ -64,6 +68,7 @@ extension ProviderRegistration {
         id: "openrouter",
         displayName: "OpenRouter",
         kind: .api,
+        supportsQuotaProjection: false,
         navigation: ProviderNavigationMetadata(
             title: "OpenRouter",
             icon: .brand(resourceName: "openrouter")

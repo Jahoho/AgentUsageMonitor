@@ -87,6 +87,7 @@ Provider setup lives inside `Settings` and is documented in [Configuration](docs
 - DeepSeek supports multiple labeled keys and an optional loopback-only proxy at `127.0.0.1:18491` for explicit usage capture.
 - OpenRouter supports multiple labeled keys. Management keys can expose additional official account and activity data.
 - Claude remains intentionally limited until a stable, machine-readable official subscription source is available.
+- Quota projection appears only on an eligible subscription Coding Plan provider page. Overview and directly billed API-key providers do not show it.
 
 ## Privacy And Security
 
