@@ -10,7 +10,7 @@ MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 RESOURCE_BUNDLE_NAME="AgentUsageMonitor_AgentUsageMonitor.bundle"
 BUILD_RESOURCE_BUNDLE="$ROOT_DIR/.build/release/$RESOURCE_BUNDLE_NAME"
-APP_RESOURCE_BUNDLE="$STAGING_APP_DIR/$RESOURCE_BUNDLE_NAME"
+APP_RESOURCE_BUNDLE="$RESOURCES_DIR/$RESOURCE_BUNDLE_NAME"
 ICON_FILE="$ROOT_DIR/Packaging/AppIcon/AgentUsageMonitor.icns"
 
 cleanup() {
@@ -54,6 +54,12 @@ cp "$ROOT_DIR/Packaging/AgentUsageMonitor.Info.plist" "$CONTENTS_DIR/Info.plist"
 cp "$ICON_FILE" "$RESOURCES_DIR/AgentUsageMonitor.icns"
 /usr/bin/ditto "$BUILD_RESOURCE_BUNDLE" "$APP_RESOURCE_BUNDLE"
 
+# Seal the completed local bundle so Gatekeeper can verify that its plist and
+# resources belong to the executable. This is an ad-hoc signature only; public
+# distribution still requires Developer ID signing and notarization.
+/usr/bin/xattr -cr "$STAGING_APP_DIR"
+/usr/bin/codesign --force --sign - "$STAGING_APP_DIR"
+
 "$ROOT_DIR/scripts/verify-package.sh" "$STAGING_APP_DIR"
 
 if [[ -d "$APP_DIR" ]]; then
@@ -63,6 +69,14 @@ fi
 if ! /bin/mv "$STAGING_APP_DIR" "$APP_DIR"; then
   rollback
   echo "Packaging failed while replacing the release bundle; the previous package was restored." >&2
+  exit 1
+fi
+
+# Desktop sync providers can add Finder metadata when the bundle becomes a
+# visible .app. Verify the sealed contents without racing that metadata writer.
+if ! "$ROOT_DIR/scripts/verify-package.sh" "$APP_DIR"; then
+  rollback
+  echo "Final package signature verification failed; the previous package was restored." >&2
   exit 1
 fi
 

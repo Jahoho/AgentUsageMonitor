@@ -19,7 +19,7 @@ An `Official` label describes the source of a value. It does not imply that the 
 | --- | --- | --- | --- |
 | Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Eligible scalar samples may be retained locally for analysis, but previous official quota is never used as fallback. |
 | Codex quota projection | Recent same-account, same-window and same-reset-cycle Official quota samples | Estimated when reliable; otherwise Unavailable | Requires at least five samples plus 30 continuous minutes for short windows or 6 hours of sufficiently dense coverage for long windows. Normal long-window sampling gaps widen uncertainty instead of invalidating all history. Never supplies current quota. |
-| Codex weekly review | Same-account Official weekly quota samples retained locally | Observed when the current cycle has enough history; otherwise Unavailable | Reports only captured change and coverage. Previous-cycle comparison requires comparable start coverage and a same-progress sample; it never extrapolates a full week or supplies current quota. |
+| Codex weekly recap | Same-account Official weekly quota samples retained locally | Observed for a trustworthy completed cycle; otherwise Unavailable | Reports completed-cycle outcome, attributable rhythm, personal baseline and recent plan-fit pattern. Requires boundary coverage and at least 15% sample density; never supplies current quota or recommends a plan change. |
 | Codex reset credits | Official reset-credit API or CLI RPC fields | Official | Expiry appears only when the source exposes an explicit date. No 30-day rule is inferred. |
 | Codex token activity | Explicit token counters in local live and archived session logs | Observed | Rolling 30x24-hour history after duplicate, replay and future-event filtering. Never populates quota bars. |
 | Claude subscription | Local Claude Code availability and user-opened official usage surface | Unavailable for exact quota | No scraping, local estimate or stale quota fallback. |
@@ -62,11 +62,11 @@ History cannot populate current Official bars, change provider health or hide a 
 
 ## Weekly Subscription Review
 
-The weekly review is derived from the same protected scalar history. Official window duration takes priority over primary/secondary source position when assigning the Session or Weekly id. Legacy long-primary observations are interpreted as weekly only in memory when their reset lead exceeds one day; the stored file remains unchanged.
+The weekly recap is derived from the same protected scalar history. Official window duration takes priority over primary/secondary source position when assigning the Session or Weekly id. Legacy long-primary observations are interpreted as weekly only in memory when their reset lead exceeds one day; the stored file remains unchanged.
 
-A material capacity refill starts a new observed cycle. Reset-time movement on its own does not create a fake cycle. The current summary requires two samples spanning at least 30 minutes and reports observed quota decrease, observed duration and density against the five-minute capture schedule. It claims cycle-to-date coverage only when capture began near full capacity with at least six days of reset lead; otherwise the wording is limited to the observed span.
+A material capacity refill starts a new observed segment. Reset-time movement on its own does not create a fake segment, and a capacity correction before reset is not treated as a completed week. The recap waits for the segment's own reset to pass and requires a near-full sample within 12 hours of its nominal start, a final sample within six hours of reset, and at least 15% of the expected five-minute samples. If those conditions fail, it does not fall back to the current-cycle percentage.
 
-Comparison uses the previous observed cycle at the same elapsed progress point. Both cycles must begin near full capacity, and the previous sample must be within two hours of the target. When those conditions are not met, the Overview card says comparison is still being collected. No unobserved time is filled with zero usage or a predicted pace.
+Rhythm assigns a quota decrease to a day only when the surrounding samples are no more than four hours apart and at least half of the cycle's observed decrease can be attributed this way. A personal baseline requires three earlier trustworthy cycles and uses the median of up to four. Plan fit requires three trustworthy completed cycles and summarizes ample headroom, repeated low headroom, or mixed outcomes across at most four recent cycles. No unobserved time is filled with zero usage or a predicted pace, and no plan recommendation is inferred.
 
 ## Adding A Provider
 

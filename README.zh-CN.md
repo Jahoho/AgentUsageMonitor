@@ -27,7 +27,7 @@ Agent Usage Monitor 通过紧凑的原生 macOS 界面，集中展示日常 AI �
 
 | Provider | 当前显示内容 | 数据来源 |
 | --- | --- | --- |
-| Codex | 当前额度、重置时间、reset credits、紧凑的本地额度预测，以及可展开的每周复盘 | 当前官方 ChatGPT Codex API 或 Codex CLI RPC；预测和复盘使用经过隐私隔离的本地官方样本 |
+| Codex | 当前额度、重置时间、reset credits、紧凑的本地额度预测，以及可展开的每周 recap | 当前官方 ChatGPT Codex API 或 Codex CLI RPC；预测和 recap 使用经过隐私隔离的本地官方样本 |
 | Codex activity | 今日、滚动 30 天和每小时本地 Token 活动 | 本地 Codex session 日志中的明确用量字段 |
 | Claude | Claude Code 安装状态和官方用量入口 | 本地 CLI 可用性；准确额度暂不可用 |
 | DeepSeek | 账户余额 | 官方 `/user/balance` API |
@@ -110,7 +110,7 @@ Swift Package 分为两层：
 - 当前 Claude adapter 无法提供准确的订阅额度。
 - Codex 本地 Token activity 是观测遥测，不是官方账户账单总量。
 - Codex 额度预测至少需要同一重置周期内 5 个 Official 样本；短周期需要连续覆盖 30 分钟，长周期需要累计 6 小时且样本密度足够。正常的隔夜空档只会扩大不确定区间，不会让全部历史失效。
-- Codex 每周复盘至少需要当前周 30 分钟的历史。只有当前周和上一周都从接近周期起点开始记录，并且上一周存在与当前进度相差不超过 2 小时的样本时，才会显示跨周期比较。
+- Codex 每周 recap 只回顾已经结束的周期，并要求该周期在起点和重置前都有样本、五分钟预期采样覆盖率至少达到 15%。超过 4 小时空档的变化不会被归入使用节奏；个人基线需要更早的 3 个完整周期，Plan fit 至少需要 3 个完整周期，并且只描述事实，不直接建议更换套餐。
 - DeepSeek 历史 activity 只包含经过本应用代理的请求。
 - OpenRouter Token activity 需要 Management Key，并且只反映官方 API 返回的记录。
 

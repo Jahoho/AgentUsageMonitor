@@ -23,7 +23,7 @@ Inside a Git checkout this performs:
 2. tracked-file and credential-pattern security checks;
 3. all Swift tests;
 4. a clean staged Release build;
-5. package identity and resource verification.
+5. package identity, resources and local ad-hoc signature verification.
 
 GitHub's automatically generated source archives do not include `.git`. In that environment, repository-only checks are skipped while tests, packaging and package verification still run.
 
@@ -42,15 +42,15 @@ The output is:
 releases/AgentUsageMonitor.app
 ```
 
-The package script builds into a hidden staging bundle, verifies it, and then replaces the local Release bundle without carrying stale resources forward. The app icon is generated reproducibly by `scripts/generate-app-icon.swift`.
+The package script builds into a hidden staging bundle, seals the completed bundle with a local ad-hoc signature, and verifies both the staging bundle and final Release path without carrying stale resources forward. Because a Desktop/FileProvider checkout can attach Finder metadata after packaging, strict verification is repeated on a metadata-free temporary copy without mutating the Release bundle. The app icon is generated reproducibly by `scripts/generate-app-icon.swift`.
 
 SwiftPM resources are copied to:
 
 ```text
-releases/AgentUsageMonitor.app/AgentUsageMonitor_AgentUsageMonitor.bundle
+releases/AgentUsageMonitor.app/Contents/Resources/AgentUsageMonitor_AgentUsageMonitor.bundle
 ```
 
-This matches SwiftPM's generated `Bundle.module` lookup for the current executable package.
+The app loads this standard bundle location when packaged and falls back to SwiftPM's generated `Bundle.module` lookup during local development.
 
 ## Local Installation
 
@@ -61,7 +61,7 @@ Quit any running copy, then run:
 ./scripts/verify-installation.sh
 ```
 
-Installation uses a verified staging copy, retains the previous app as a temporary rollback bundle, compares the installed app with the Release package, and removes the rollback copy only after verification succeeds.
+Installation uses a verified staging copy without carrying workspace-only extended attributes, retains the previous app as a temporary rollback bundle, compares the installed app with the Release package, and requires the actual `/Applications` bundle to pass strict on-disk signature verification before removing the rollback copy.
 
 After a successful install, only this bundle remains:
 
@@ -75,7 +75,7 @@ The installer removes historical or temporary app paths but does not delete Keyc
 
 The current local package is built for the host architecture. On Apple Silicon it is `arm64`; on Intel it is `x86_64`.
 
-The current bundle is only linker/ad-hoc signed and is not notarized. It should not be attached to a GitHub Release as though it were a trusted production binary. Users who build locally control the resulting executable and macOS trust decision.
+The current bundle receives a local ad-hoc signature so macOS can verify that its executable, plist and resources belong together. It has no Developer ID identity and is not notarized. It should not be attached to a GitHub Release as though it were a trusted production binary. Users who build locally control the resulting executable and macOS trust decision.
 
 ## Future Binary Distribution
 

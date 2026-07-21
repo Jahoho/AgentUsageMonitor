@@ -36,7 +36,7 @@ fi
 
 "$ROOT_DIR/scripts/package-app.sh"
 "$ROOT_DIR/scripts/verify-package.sh" "$APP_DIR"
-/usr/bin/ditto "$APP_DIR" "$STAGING_DEST_DIR"
+/usr/bin/ditto --norsrc --noextattr "$APP_DIR" "$STAGING_DEST_DIR"
 "$ROOT_DIR/scripts/verify-package.sh" "$STAGING_DEST_DIR"
 
 if [[ -d "$DEST_DIR" ]]; then
@@ -49,7 +49,8 @@ if ! /bin/mv "$STAGING_DEST_DIR" "$DEST_DIR"; then
   exit 1
 fi
 
-if ! "$ROOT_DIR/scripts/verify-package.sh" "$DEST_DIR"; then
+if ! "$ROOT_DIR/scripts/verify-package.sh" "$DEST_DIR" \
+  || ! /usr/bin/codesign --verify --deep --strict --verbose=2 "$DEST_DIR"; then
   rollback
   echo "Installed package verification failed; the previous version was restored." >&2
   exit 1

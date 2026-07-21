@@ -162,7 +162,7 @@ final class DashboardViewModel: ObservableObject {
         _ review: WeeklySubscriptionReview,
         snapshot: ProviderSnapshot
     ) -> Bool {
-        guard let reviewResetAt = review.currentCycle?.resetAt else {
+        guard let reviewResetAt = review.currentResetAt else {
             return false
         }
         return snapshot.bars.contains { bar in
