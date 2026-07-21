@@ -177,8 +177,8 @@
 - Confirm Codex reads usage automatically when `~/.codex/auth.json` or the Codex CLI RPC source is available.
 - After two eligible Codex refreshes at least five minutes apart, confirm `quota-observations-v1.jsonl` contains scalar samples only and does not contain the visible account email, access token or response text.
 - Temporarily make the Codex official refresh fail after a successful sample and confirm current quota reports the error rather than reading history as fallback.
-- Confirm Overview and the Codex page show the same compact Quota projection card without adding prediction state to the menu-bar icon.
-- With insufficient same-cycle history, confirm both surfaces say that more history is being collected and label the projection `Unavailable` rather than guessing a pace.
+- Confirm the compact Quota projection card appears on the Codex detail page only. Overview, DeepSeek, and OpenRouter must not render it, and the menu-bar icon must not gain prediction state.
+- With insufficient same-cycle history, confirm the Codex page says that more history is being collected and labels the projection `Unavailable` rather than guessing a pace.
 - With sufficient history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label. A wide but uniformly exhausted long-window range must omit the specific exhaustion time.
 - Temporarily make the current Codex official refresh fail after an Estimated projection exists and confirm the card immediately becomes `Unavailable` while the old projection is not displayed as current.
 - Confirm Overview shows one compact `Weekly review` card while the Codex detail page does not duplicate it. Click the card and confirm cycle coverage, sampling coverage and previous-cycle detail expand in place.

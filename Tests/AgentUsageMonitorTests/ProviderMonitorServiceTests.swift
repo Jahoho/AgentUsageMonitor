@@ -663,6 +663,7 @@ private func testRegistration(
         id: id,
         displayName: name,
         kind: kind,
+        supportsQuotaProjection: false,
         navigation: ProviderNavigationMetadata(
             title: name,
             icon: .brand(resourceName: id)

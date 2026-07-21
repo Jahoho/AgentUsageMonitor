@@ -87,6 +87,7 @@ Provider 配置位于应用内的 `Settings`，详细说明见 [Configuration](d
 - DeepSeek 支持多个带名称的 Key，并可通过仅监听 `127.0.0.1:18491` 的可选回环代理捕获明确的 usage 数据。
 - OpenRouter 支持多个带名称的 Key。Management Key 可以提供更多官方账户与 activity 数据。
 - 在出现稳定、机器可读的官方订阅来源之前，Claude 会继续保持明确的有限支持状态。
+- 额度预测只显示在具备可靠数据源的订阅 Coding Plan 平台详情页；Overview 和按量计费的 API Key 平台不会显示。
 
 ## 隐私与安全
 

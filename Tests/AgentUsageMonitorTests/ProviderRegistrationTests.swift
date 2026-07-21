@@ -20,6 +20,10 @@ import Testing
     #expect(openRouter.freshnessPolicy == .requireCurrent)
     #expect(claude.freshnessPolicy == .preserveLastKnown)
     #expect(deepSeek.freshnessPolicy == .preserveLastKnown)
+    #expect(codex.supportsQuotaProjection)
+    #expect(claude.supportsQuotaProjection == false)
+    #expect(deepSeek.supportsQuotaProjection == false)
+    #expect(openRouter.supportsQuotaProjection == false)
     #expect(codex.navigation.icon.brandResourceName == "codex")
     #expect(openRouter.navigation.icon.brandResourceName == "openrouter")
     #expect(ProviderRegistry.liveRegistrations == registrations)
@@ -31,6 +35,7 @@ import Testing
         id: "example",
         displayName: "Example API",
         kind: .api,
+        supportsQuotaProjection: false,
         navigation: ProviderNavigationMetadata(
             title: "Example",
             icon: .brand(resourceName: "example-mark")

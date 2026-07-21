@@ -4,6 +4,7 @@ import SwiftUI
 struct ProviderSnapshotView: View {
     let snapshot: ProviderSnapshot
     let quotaProjection: QuotaProjection?
+    let supportsQuotaProjection: Bool
     let openAction: (ProviderAction) -> Void
 
     var body: some View {
@@ -22,7 +23,7 @@ struct ProviderSnapshotView: View {
                 ResetBankView(bank: resetBank)
             }
 
-            if snapshot.id == "codex" {
+            if supportsQuotaProjection {
                 QuotaProjectionCard(snapshot: snapshot, projection: quotaProjection)
             }
 
