@@ -90,7 +90,8 @@ struct DashboardView: View {
             OverviewView(
                 snapshot: snapshot,
                 providerSnapshots: viewModel.snapshots.filter { $0.id != "overview" },
-                quotaProjections: viewModel.quotaProjections
+                quotaProjections: viewModel.quotaProjections,
+                weeklySubscriptionReviews: viewModel.weeklySubscriptionReviews
             )
         } else if let snapshot = viewModel.selectedSnapshot {
             ProviderSnapshotView(

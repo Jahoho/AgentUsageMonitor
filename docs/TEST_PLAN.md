@@ -58,6 +58,10 @@
 - Projection ranges include fit, holdout, discrete-event timing and behavioral pace error. Error above 20 percentage points normally suppresses the estimate, except when an entire long-window range still predicts exhaustion before reset.
 - Multiple windows select the lowest projected lower bound, and outcomes distinguish remaining at reset, possible exhaustion and likely exhaustion.
 - Quota projection fails closed without loading history when current Official quota fails, and explains missing reset timing or history storage separately.
+- Codex window identity prefers official duration, so a weekly-only primary window maps to `codex-weekly`; legacy long-primary observations normalize in memory without rewriting true five-hour session history.
+- Weekly review segments cycles on material capacity refill rather than reset-time jitter, requires at least 30 minutes of current-cycle history, and distinguishes full cycle-to-date coverage from a partial observed span.
+- Weekly review reports five-minute sample coverage and compares the previous cycle only at a matching progress point within two hours; missing or partial previous coverage remains explicit.
+- Weekly review fails closed with current Official quota/account failures and cannot populate quota bars or provider health.
 - Codex OAuth/RPC rate limit snapshots map into official provider bars.
 - Codex adapter returns an error when OAuth/RPC sources exceed the adapter-level official sync timeout.
 - Codex adapter retries a transient official transport failure once inside the same bounded refresh, has enough default budget for two complete source attempts, and records when that retry recovered current official data.
@@ -177,6 +181,8 @@
 - With insufficient same-cycle history, confirm both surfaces say that more history is being collected and label the projection `Unavailable` rather than guessing a pace.
 - With sufficient history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label. A wide but uniformly exhausted long-window range must omit the specific exhaustion time.
 - Temporarily make the current Codex official refresh fail after an Estimated projection exists and confirm the card immediately becomes `Unavailable` while the old projection is not displayed as current.
+- Confirm Overview shows one compact `Weekly review` card while the Codex detail page does not duplicate it. Click the card and confirm cycle coverage, sampling coverage and previous-cycle detail expand in place.
+- With only the current weekly cycle recorded, confirm the card shows Observed use and says that a fair previous-cycle comparison is still being collected. With comparable prior history, confirm it compares remaining quota at the same cycle progress rather than total values from unequal spans.
 - Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
 - Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.
 - Confirm Codex `Today local tokens`, `30d local tokens`, `Latest local tokens`, `Top local model`, and hourly activity use reported `total_tokens`; each token card shows one total and a cached-input percentage, with no local USD or credit estimate.

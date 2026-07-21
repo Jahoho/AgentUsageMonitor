@@ -8,10 +8,10 @@ Notable user-visible changes are documented here. The project follows semantic v
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
 - A compact Estimated Codex quota projection in Overview and the Codex detail page, showing a remaining-at-reset range or possible exhaustion, tolerating normal long-window sampling gaps, and suppressing genuinely sparse or unstable forecasts.
+- An expandable Observed weekly subscription review in Overview, showing current-cycle use, honest history coverage, and a same-point previous-cycle comparison when comparable history exists.
 
 ### Planned
 
-- Weekly Codex subscription review aligned to official reset cycles.
 - Signed and notarized macOS distribution.
 - Additional providers only when a stable official or explicitly observed usage source is available.
 

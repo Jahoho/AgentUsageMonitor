@@ -6,6 +6,7 @@ struct OverviewView: View {
     let snapshot: ProviderSnapshot
     let providerSnapshots: [ProviderSnapshot]
     let quotaProjections: [String: QuotaProjection]
+    let weeklySubscriptionReviews: [String: WeeklySubscriptionReview]
 
     private var activeAgent: OverviewActiveAgent? {
         OverviewActiveAgent.resolve(from: providerSnapshots)
@@ -21,6 +22,11 @@ struct OverviewView: View {
                 QuotaProjectionCard(
                     snapshot: codexSnapshot,
                     projection: quotaProjections[codexSnapshot.id]
+                )
+
+                WeeklySubscriptionReviewCard(
+                    snapshot: codexSnapshot,
+                    review: weeklySubscriptionReviews[codexSnapshot.id]
                 )
             }
 

@@ -6,7 +6,17 @@ protocol QuotaProjectionProviding: Sendable {
     func refreshProjections(
         from snapshots: [ProviderSnapshot],
         now: Date
-    ) async -> [String: QuotaProjection]
+    ) async -> QuotaProjectionRefreshResult
+}
+
+struct QuotaProjectionRefreshResult: Sendable {
+    let projections: [String: QuotaProjection]
+    let weeklyReviews: [String: WeeklySubscriptionReview]
+
+    static let empty = QuotaProjectionRefreshResult(
+        projections: [:],
+        weeklyReviews: [:]
+    )
 }
 
 actor QuotaProjectionService: QuotaProjectionProviding {
@@ -28,9 +38,9 @@ actor QuotaProjectionService: QuotaProjectionProviding {
     func refreshProjections(
         from snapshots: [ProviderSnapshot],
         now: Date = Date()
-    ) async -> [String: QuotaProjection] {
+    ) async -> QuotaProjectionRefreshResult {
         guard let snapshot = snapshots.first(where: { $0.id == "codex" }) else {
-            return [:]
+            return .empty
         }
         if let reason = Self.currentUnavailabilityReason(for: snapshot, now: now) {
             return unavailable(reason, now: now)
@@ -58,14 +68,30 @@ actor QuotaProjectionService: QuotaProjectionProviding {
 
             try await observationStore.record(current, now: now)
             let history = try await observationStore.load(now: now)
-            guard let projection = QuotaProjectionAnalyzer.analyze(
-                current: current,
-                history: history,
+            let normalizedCurrent = CodexQuotaObservationNormalizer.normalize(current)
+            let normalizedHistory = CodexQuotaObservationNormalizer.normalize(history)
+            let projection = QuotaProjectionAnalyzer.analyze(
+                current: normalizedCurrent,
+                history: normalizedHistory,
                 now: now
-            ) else {
-                return unavailable(.insufficientHistory, now: now)
-            }
-            return [snapshot.id: projection]
+            ) ?? QuotaProjection.unavailable(
+                providerID: snapshot.id,
+                reason: .insufficientHistory,
+                generatedAt: now
+            )
+            let weeklyReview = WeeklySubscriptionReviewAnalyzer.analyze(
+                current: normalizedCurrent,
+                history: normalizedHistory,
+                now: now
+            ) ?? WeeklySubscriptionReview.unavailable(
+                providerID: snapshot.id,
+                reason: .weeklyWindowUnavailable,
+                generatedAt: now
+            )
+            return QuotaProjectionRefreshResult(
+                projections: [snapshot.id: projection],
+                weeklyReviews: [snapshot.id: weeklyReview]
+            )
         } catch {
             // History and projections are optional and must never affect current provider health.
             return unavailable(.historyUnavailable, now: now)
@@ -142,14 +168,40 @@ actor QuotaProjectionService: QuotaProjectionProviding {
     private func unavailable(
         _ reason: QuotaProjectionAvailabilityReason,
         now: Date
-    ) -> [String: QuotaProjection] {
-        [
-            "codex": QuotaProjection.unavailable(
-                providerID: "codex",
-                reason: reason,
-                generatedAt: now
-            )
-        ]
+    ) -> QuotaProjectionRefreshResult {
+        QuotaProjectionRefreshResult(
+            projections: [
+                "codex": QuotaProjection.unavailable(
+                    providerID: "codex",
+                    reason: reason,
+                    generatedAt: now
+                )
+            ],
+            weeklyReviews: [
+                "codex": WeeklySubscriptionReview.unavailable(
+                    providerID: "codex",
+                    reason: Self.weeklyReviewAvailabilityReason(for: reason),
+                    generatedAt: now
+                )
+            ]
+        )
+    }
+
+    nonisolated static func weeklyReviewAvailabilityReason(
+        for reason: QuotaProjectionAvailabilityReason
+    ) -> WeeklySubscriptionReviewAvailabilityReason {
+        switch reason {
+        case .currentQuotaUnavailable:
+            return .currentQuotaUnavailable
+        case .accountScopeUnavailable:
+            return .accountScopeUnavailable
+        case .resetUnavailable:
+            return .weeklyWindowUnavailable
+        case .historyUnavailable:
+            return .historyUnavailable
+        case .insufficientHistory, .sparseHistory, .unstableTrend:
+            return .insufficientCurrentCycle
+        }
     }
 
     private nonisolated static func officialAccountIdentity(in snapshot: ProviderSnapshot) -> String? {

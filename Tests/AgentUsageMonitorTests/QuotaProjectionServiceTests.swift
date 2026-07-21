@@ -37,11 +37,12 @@ import Testing
         ]
     )
 
-    let projections = await service.refreshProjections(from: [snapshot], now: now)
+    let result = await service.refreshProjections(from: [snapshot], now: now)
     let observations = try await observationStore.load(now: now)
 
-    #expect(projections["codex"]?.availabilityReason == .insufficientHistory)
-    #expect(projections["codex"]?.confidence == .unavailable)
+    #expect(result.projections["codex"]?.availabilityReason == .insufficientHistory)
+    #expect(result.projections["codex"]?.confidence == .unavailable)
+    #expect(result.weeklyReviews["codex"]?.availabilityReason == .insufficientCurrentCycle)
     #expect(observations.map(\.quotaID) == ["codex-session", "codex-weekly"])
     #expect(observations.map(\.remainingFraction) == [0.75, 0.4])
     #expect(observations.allSatisfy { $0.capturedAt == now })
@@ -109,10 +110,11 @@ import Testing
         ]
     )
 
-    let projections = await service.refreshProjections(from: [failedSnapshot], now: now)
+    let result = await service.refreshProjections(from: [failedSnapshot], now: now)
 
-    #expect(projections["codex"]?.confidence == .unavailable)
-    #expect(projections["codex"]?.availabilityReason == .currentQuotaUnavailable)
+    #expect(result.projections["codex"]?.confidence == .unavailable)
+    #expect(result.projections["codex"]?.availabilityReason == .currentQuotaUnavailable)
+    #expect(result.weeklyReviews["codex"]?.availabilityReason == .currentQuotaUnavailable)
     #expect(await observationStore.loadCallCount() == 0)
 }
 
@@ -133,13 +135,13 @@ import Testing
         ]
     )
 
-    let missingResetProjections = await missingResetService.refreshProjections(
+    let missingResetResult = await missingResetService.refreshProjections(
         from: [missingReset],
         now: now
     )
 
-    #expect(missingResetProjections["codex"]?.confidence == .unavailable)
-    #expect(missingResetProjections["codex"]?.availabilityReason == .resetUnavailable)
+    #expect(missingResetResult.projections["codex"]?.confidence == .unavailable)
+    #expect(missingResetResult.projections["codex"]?.availabilityReason == .resetUnavailable)
 
     let failingHistoryService = QuotaProjectionService(
         observationStore: CapacityTestObservationStore(shouldFailLoading: true),
@@ -156,13 +158,14 @@ import Testing
         ]
     )
 
-    let failingHistoryProjections = await failingHistoryService.refreshProjections(
+    let failingHistoryResult = await failingHistoryService.refreshProjections(
         from: [currentSnapshot],
         now: now
     )
 
-    #expect(failingHistoryProjections["codex"]?.confidence == .unavailable)
-    #expect(failingHistoryProjections["codex"]?.availabilityReason == .historyUnavailable)
+    #expect(failingHistoryResult.projections["codex"]?.confidence == .unavailable)
+    #expect(failingHistoryResult.projections["codex"]?.availabilityReason == .historyUnavailable)
+    #expect(failingHistoryResult.weeklyReviews["codex"]?.availabilityReason == .historyUnavailable)
 }
 
 @Test func quotaProjectionScopeIsStablePerInstallationAndSeparatesAccounts() async throws {
@@ -209,6 +212,91 @@ import Testing
     #expect(secondObservations[0].accountScopeID == firstScope)
     #expect(secondObservations[1].accountScopeID != firstScope)
     #expect(scopeKey.contains("person@example.com") == false)
+}
+
+@Test func quotaProjectionServiceBuildsWeeklyReviewFromRecordedOfficialSamples() async throws {
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let resetAt = start.addingTimeInterval(7 * 24 * 60 * 60)
+    let observationStore = CapacityTestObservationStore()
+    let service = QuotaProjectionService(
+        observationStore: observationStore,
+        secretStore: CapacityTestSecretStore()
+    )
+
+    _ = await service.refreshProjections(
+        from: [
+            capacitySnapshot(
+                updatedAt: start,
+                bars: [capacityBar(id: "codex-weekly", remainingFraction: 1, resetAt: resetAt)]
+            )
+        ],
+        now: start
+    )
+    let later = start.addingTimeInterval(60 * 60)
+    let result = await service.refreshProjections(
+        from: [
+            capacitySnapshot(
+                updatedAt: later,
+                bars: [capacityBar(id: "codex-weekly", remainingFraction: 0.9, resetAt: resetAt)]
+            )
+        ],
+        now: later
+    )
+
+    let review = try #require(result.weeklyReviews["codex"])
+    let cycle = try #require(review.currentCycle)
+    #expect(review.confidence == .observed)
+    #expect(cycle.usageScope == .cycleToDate)
+    #expect(abs(cycle.observedUsedFraction - 0.1) < 0.000_001)
+}
+
+@Test func quotaProjectionServiceKeepsLegacyLongPrimaryHistoryAfterWeeklyIDCorrection() async throws {
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    let resetAt = start.addingTimeInterval(7 * 24 * 60 * 60)
+    let service = QuotaProjectionService(
+        observationStore: CapacityTestObservationStore(),
+        secretStore: CapacityTestSecretStore()
+    )
+
+    for sample in 0...12 {
+        let capturedAt = start.addingTimeInterval(TimeInterval(sample) * 30 * 60)
+        _ = await service.refreshProjections(
+            from: [
+                capacitySnapshot(
+                    updatedAt: capturedAt,
+                    bars: [
+                        capacityBar(
+                            id: "codex-session",
+                            remainingFraction: 1 - (Double(sample) * 0.01),
+                            resetAt: resetAt
+                        )
+                    ]
+                )
+            ],
+            now: capturedAt
+        )
+    }
+
+    let currentAt = start.addingTimeInterval(6.5 * 60 * 60)
+    let result = await service.refreshProjections(
+        from: [
+            capacitySnapshot(
+                updatedAt: currentAt,
+                bars: [
+                    capacityBar(
+                        id: "codex-weekly",
+                        remainingFraction: 0.87,
+                        resetAt: resetAt
+                    )
+                ]
+            )
+        ],
+        now: currentAt
+    )
+
+    let projection = try #require(result.projections["codex"])
+    #expect(projection.confidence == .estimated)
+    #expect(projection.constrainingQuotaID == "codex-weekly")
 }
 
 private actor CapacityTestObservationStore: QuotaObservationStoring {

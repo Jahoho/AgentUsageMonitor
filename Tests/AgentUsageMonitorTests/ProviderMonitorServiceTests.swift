@@ -603,13 +603,13 @@ private actor BufferedQuotaProjectionProvider: QuotaProjectionProviding {
     func refreshProjections(
         from snapshots: [ProviderSnapshot],
         now: Date
-    ) async -> [String: QuotaProjection] {
+    ) async -> QuotaProjectionRefreshResult {
         if waiters.isEmpty == false {
             waiters.removeFirst().resume(returning: snapshots)
         } else {
             bufferedSnapshots.append(snapshots)
         }
-        return [:]
+        return .empty
     }
 
     func nextSnapshots() async -> [ProviderSnapshot] {
