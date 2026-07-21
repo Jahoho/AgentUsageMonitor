@@ -110,6 +110,77 @@ import Testing
     #expect(projection.availabilityReason == .sparseHistory)
 }
 
+@Test func quotaProjectionKeepsLongTrendAcrossAnOvernightSamplingGap() throws {
+    let now = projectionDate()
+    let resetAt = now.addingTimeInterval(5 * 3_600)
+    let olderPoints = (0...28).map { index in
+        projectionObservation(
+            remaining: 0.9 - (Double(index) * (0.03 / 28)),
+            capturedAt: now.addingTimeInterval((-20 * 3_600) + Double(index * 15 * 60)),
+            resetAt: resetAt
+        )
+    }
+    let recentPoints = (0...16).map { index in
+        projectionObservation(
+            remaining: 0.87,
+            capturedAt: now.addingTimeInterval((-4 * 3_600) + Double(index * 15 * 60)),
+            resetAt: resetAt
+        )
+    }
+    let series = olderPoints + recentPoints
+
+    let projection = try #require(analyze(series: series, now: now))
+    let window = try #require(projection.constrainingWindow)
+
+    #expect(projection.confidence == .estimated)
+    #expect(window.sampleCount == 46)
+    #expect(window.coverageDuration == 20 * 3_600)
+}
+
+@Test func quotaProjectionDoesNotTreatACrossGapDropAsRecentPace() throws {
+    let now = projectionDate()
+    let resetAt = now.addingTimeInterval(5 * 3_600)
+    let olderPoints = (0...96).map { index in
+        projectionObservation(
+            remaining: 0.9,
+            capturedAt: now.addingTimeInterval((-30 * 3_600) + Double(index * 15 * 60)),
+            resetAt: resetAt
+        )
+    }
+    let recentPoints = (0...6).map { index in
+        projectionObservation(
+            remaining: 0.8,
+            capturedAt: now.addingTimeInterval((-60 * 60) + Double(index * 10 * 60)),
+            resetAt: resetAt
+        )
+    }
+    let series = olderPoints + recentPoints
+
+    let projection = try #require(analyze(series: series, now: now))
+    let window = try #require(projection.constrainingWindow)
+
+    #expect(projection.confidence == .estimated)
+    #expect(abs((window.consumptionPerHour ?? 0) - (0.1 / 30)) < 0.000_001)
+}
+
+@Test func quotaProjectionStillRejectsADiscontinuousShortWindow() throws {
+    let now = projectionDate()
+    let resetAt = now.addingTimeInterval(2 * 3_600)
+    let minutesBeforeNow = [60, 55, 50, 4, 0]
+    let series = minutesBeforeNow.enumerated().map { index, minutes in
+        projectionObservation(
+            remaining: 0.9 - (Double(index) * 0.01),
+            capturedAt: now.addingTimeInterval(-Double(minutes * 60)),
+            resetAt: resetAt
+        )
+    }
+
+    let projection = try #require(analyze(series: series, now: now))
+
+    #expect(projection.confidence == .unavailable)
+    #expect(projection.availabilityReason == .sparseHistory)
+}
+
 @Test func quotaProjectionWeightsARecentUsageChangeMoreHeavily() throws {
     let now = projectionDate()
     let resetAt = now.addingTimeInterval(60 * 60)
@@ -172,6 +243,34 @@ import Testing
     #expect(smoothProjection.confidence == .estimated)
     #expect(burstyProjection.confidence == .estimated)
     #expect((burstyWindow.forecastErrorFraction ?? 0) > (smoothWindow.forecastErrorFraction ?? 1))
+}
+
+@Test func quotaProjectionKeepsAWideLongForecastWhenExhaustionIsStillCertain() throws {
+    let now = projectionDate()
+    let resetAt = now.addingTimeInterval(94 * 3_600)
+    var remaining = 0.9
+    let burstIndexes = Set([28, 56, 84, 112, 140])
+    let series = (0...144).map { index in
+        if burstIndexes.contains(index) {
+            remaining -= 0.1
+        }
+        return projectionObservation(
+            remaining: remaining,
+            capturedAt: now.addingTimeInterval((-36 * 3_600) + Double(index * 15 * 60)),
+            resetAt: resetAt
+        )
+    }
+
+    let projection = try #require(analyze(series: series, now: now))
+    let window = try #require(projection.constrainingWindow)
+
+    #expect(
+        (window.forecastErrorFraction ?? 0)
+            > QuotaWindowProjection.maximumPreciseForecastError
+    )
+    #expect(window.projectedRemainingUpperBound.map { $0 <= 0 } == true)
+    #expect(window.outcome == .likelyExhaustsBeforeReset)
+    #expect(projection.confidence == .estimated)
 }
 
 @Test func quotaProjectionUsesTheMostConstrainedEstimatedWindow() throws {

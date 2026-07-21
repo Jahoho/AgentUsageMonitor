@@ -86,6 +86,37 @@ import Testing
     #expect(presentation.primaryText == "Weekly may run out before reset.")
 }
 
+@Test func quotaProjectionPresentationOmitsExhaustionTimeForAWideRange() {
+    let snapshot = projectionSnapshot(health: .ready)
+    let window = QuotaWindowProjection(
+        quotaID: "codex-weekly",
+        currentRemainingFraction: 0.4,
+        projectedRemainingAtReset: -0.5,
+        projectedRemainingLowerBound: -1,
+        projectedRemainingUpperBound: -0.1,
+        projectedExhaustionAt: snapshot.updatedAt.addingTimeInterval(24 * 3_600),
+        resetAt: snapshot.updatedAt.addingTimeInterval(4 * 24 * 3_600),
+        consumptionPerHour: 0.02,
+        sampleCount: 100,
+        coverageDuration: 30 * 3_600,
+        sampleCoverageFraction: 0.5,
+        forecastErrorFraction: 0.5
+    )
+    let projection = QuotaProjection(
+        providerID: "codex",
+        constrainingQuotaID: window.quotaID,
+        windows: [window],
+        generatedAt: snapshot.updatedAt
+    )
+
+    let presentation = QuotaProjectionPresentation(
+        snapshot: snapshot,
+        projection: projection
+    )
+
+    #expect(presentation.primaryText == "Weekly is expected to run out before reset.")
+}
+
 private func projectionWindow(
     projectedRemaining: Double,
     lowerBound: Double,

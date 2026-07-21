@@ -108,7 +108,7 @@ Start with the [Documentation Index](docs/README.md), [Architecture](docs/ARCHIT
 - The app is not signed or notarized for third-party binary distribution.
 - Claude does not expose exact subscription quota in the current adapter.
 - Codex local token activity is observed telemetry, not an official account billing total.
-- Codex quota projection needs at least five continuous same-cycle Official samples; short windows require 30 minutes of coverage and long windows require 6 hours. Sparse or unstable history remains Unavailable.
+- Codex quota projection needs at least five same-cycle Official samples; short windows require 30 continuous minutes, while long windows require 6 hours of sampled coverage and sufficient density. Normal overnight gaps widen uncertainty instead of invalidating all history.
 - DeepSeek historical activity includes only requests that pass through this app's proxy.
 - OpenRouter token activity requires a management key and only reflects records returned by the official API.
 

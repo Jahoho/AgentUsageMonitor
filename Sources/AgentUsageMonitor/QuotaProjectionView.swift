@@ -73,7 +73,11 @@ struct QuotaProjectionPresentation {
         case .mayExhaustBeforeReset:
             return "\(label) may run out before reset."
         case .likelyExhaustsBeforeReset:
-            guard let exhaustionAt = window.projectedExhaustionAt else {
+            guard let exhaustionAt = window.projectedExhaustionAt,
+                  window.forecastErrorFraction.map({
+                      $0 <= QuotaWindowProjection.maximumPreciseForecastError
+                  }) == true
+            else {
                 return "\(label) is expected to run out before reset."
             }
             return "\(label) is expected to run out around \(Self.dateText(exhaustionAt))."

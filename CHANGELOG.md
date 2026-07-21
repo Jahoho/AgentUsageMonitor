@@ -7,7 +7,7 @@ Notable user-visible changes are documented here. The project follows semantic v
 ### Added
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
-- A compact Estimated Codex quota projection in Overview and the Codex detail page, showing a remaining-at-reset range or possible exhaustion while suppressing sparse and unstable forecasts.
+- A compact Estimated Codex quota projection in Overview and the Codex detail page, showing a remaining-at-reset range or possible exhaustion, tolerating normal long-window sampling gaps, and suppressing genuinely sparse or unstable forecasts.
 
 ### Planned
 
