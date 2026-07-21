@@ -16,6 +16,8 @@ struct HeaderView: View {
                         isSelected: viewModel.selectedProviderID == item.id
                     )
                         .frame(width: 35, height: 32)
+                        // Transparent artwork should not create holes in the tab's hit target.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(TabButtonStyle(isSelected: viewModel.selectedProviderID == item.id))
                 .help(item.title)
