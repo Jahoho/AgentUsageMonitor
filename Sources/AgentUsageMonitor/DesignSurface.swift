@@ -42,11 +42,6 @@ enum DesignSurface {
         light: NSColor(red: 0.780, green: 0.560, blue: 0.335, alpha: 1),
         dark: NSColor(red: 0.570, green: 0.780, blue: 1.000, alpha: 1)
     )
-    static let risk = dynamicColor(
-        light: NSColor(red: 0.730, green: 0.260, blue: 0.230, alpha: 1),
-        dark: NSColor(red: 1.000, green: 0.430, blue: 0.390, alpha: 1)
-    )
-
     private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
         Color(NSColor(name: nil) { appearance in
             let match = appearance.bestMatch(from: [.darkAqua, .aqua])

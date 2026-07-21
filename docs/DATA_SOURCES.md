@@ -18,7 +18,7 @@ An `Official` label describes the source of a value. It does not imply that the 
 | Provider surface | Source | Confidence | History and fallback behavior |
 | --- | --- | --- | --- |
 | Codex quota windows | ChatGPT Codex usage API or `account/rateLimits/read` CLI RPC | Official | Requires a usable current response. Eligible scalar samples may be retained locally for analysis, but previous official quota is never used as fallback. |
-| Codex Headroom and Capacity Weather | Recent same-account, same-window and same-reset-cycle Official quota samples | Estimated when sufficient; otherwise Unavailable | Requires at least three samples plus 30 minutes of coverage for short windows or 6 hours for long windows. Never supplies current quota. |
+| Codex quota projection | Recent same-account, same-window and same-reset-cycle Official quota samples | Estimated when reliable; otherwise Unavailable | Requires at least five continuous samples plus 30 minutes of coverage for short windows or 6 hours for long windows. Sparse, unstable or overly wide results are suppressed. Never supplies current quota. |
 | Codex reset credits | Official reset-credit API or CLI RPC fields | Official | Expiry appears only when the source exposes an explicit date. No 30-day rule is inferred. |
 | Codex token activity | Explicit token counters in local live and archived session logs | Observed | Rolling 30x24-hour history after duplicate, replay and future-event filtering. Never populates quota bars. |
 | Claude subscription | Local Claude Code availability and user-opened official usage surface | Unavailable for exact quota | No scraping, local estimate or stale quota fallback. |
@@ -49,11 +49,13 @@ The app records a Codex quota observation only when the current raw provider ref
 
 Samples are rate-limited to one per provider, anonymous account scope and quota window every five minutes, with a new official reset cycle captured immediately. They are retained locally for approximately 90 days.
 
-Headroom compares only samples from the same provider, anonymous account scope, quota-window id and official reset cycle. It starts a new trend after a material capacity increase, then projects the recent consumption pace to the current official reset. A short window uses up to two hours of recent samples and needs at least 30 minutes of coverage; a long window uses up to 24 hours and needs at least 6 hours. Both require at least three samples.
+Quota projection compares only samples from the same provider, anonymous account scope, quota-window id and Official reset cycle. It removes isolated one-sample source spikes, starts a new trend after a capacity increase above two percentage points, and treats smaller upward movement as source noise. Every estimate requires at least five samples and at least 15% of the expected five-minute sample density. Short windows use up to three hours of recent history, need 30 minutes of coverage and allow no gap above 45 minutes. Long windows use up to 36 hours, need 6 hours of coverage and allow no gap above 4 hours.
 
-The resulting Capacity Weather is `Clear` when at least 15% is projected to remain at reset, `Windy` when the positive projection falls below 15%, and `Storm` when exhaustion is projected at or before reset. These states are always `Estimated`. Insufficient coverage is `Learning`, while missing current official quota, account scope, reset timing or readable local history is `Fog`; both are `Unavailable`. With multiple windows, the most constraining valid forecast is shown as the overall weather.
+The point estimate combines a robust recency-weighted trend with recent pace. Recent pace receives less weight as the reset gets farther away, so a short burst is not extended unchanged across a long forecast. The displayed range includes fit and holdout error plus uncertainty from discrete quota changes and variation between activity periods. If modeled error exceeds 20 percentage points, the projection remains `Unavailable` instead of showing an unhelpfully wide estimate.
 
-History cannot populate current official bars, change provider health or hide a failed official refresh. In particular, a current official failure becomes Fog before history is loaded; no stale sample is treated as present capacity. The same history may later support the separately documented weekly subscription review.
+When the entire range stays above zero, the card shows the percentage expected to remain at reset. If the range crosses zero, it says the quota may run out; if the entire range is at or below zero, it shows the approximate exhaustion time. Every displayed projection is `Estimated`. With multiple windows, the valid projection with the lowest lower bound is shown.
+
+History cannot populate current Official bars, change provider health or hide a failed Official refresh. In particular, a current Official failure becomes `Unavailable` before history is loaded; no stale sample is treated as present capacity. The same history may later support the separately documented weekly subscription review.
 
 ## Adding A Provider
 

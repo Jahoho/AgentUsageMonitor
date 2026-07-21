@@ -3,10 +3,10 @@ import Foundation
 import Testing
 @testable import AgentUsageMonitor
 
-@Test func capacityInsightRecordsOnlyEligibleCurrentOfficialCodexBars() async throws {
+@Test func quotaProjectionServiceRecordsOnlyEligibleCurrentOfficialCodexBars() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let observationStore = CapacityTestObservationStore()
-    let service = CapacityInsightService(
+    let service = QuotaProjectionService(
         observationStore: observationStore,
         secretStore: CapacityTestSecretStore()
     )
@@ -37,11 +37,11 @@ import Testing
         ]
     )
 
-    let insights = await service.refreshInsights(from: [snapshot], now: now)
+    let projections = await service.refreshProjections(from: [snapshot], now: now)
     let observations = try await observationStore.load(now: now)
 
-    #expect(insights["codex"]?.weather == .learning)
-    #expect(insights["codex"]?.confidence == .unavailable)
+    #expect(projections["codex"]?.availabilityReason == .insufficientHistory)
+    #expect(projections["codex"]?.confidence == .unavailable)
     #expect(observations.map(\.quotaID) == ["codex-session", "codex-weekly"])
     #expect(observations.map(\.remainingFraction) == [0.75, 0.4])
     #expect(observations.allSatisfy { $0.capturedAt == now })
@@ -49,10 +49,10 @@ import Testing
     #expect(observations.allSatisfy { $0.accountScopeID.contains("person@example.com") == false })
 }
 
-@Test func capacityInsightRejectsErroredFallbackStaleUnscopedAndUnsupportedSnapshots() async throws {
+@Test func quotaProjectionRejectsErroredFallbackStaleUnscopedAndUnsupportedSnapshots() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let observationStore = CapacityTestObservationStore()
-    let service = CapacityInsightService(
+    let service = QuotaProjectionService(
         observationStore: observationStore,
         secretStore: CapacityTestSecretStore()
     )
@@ -67,7 +67,7 @@ import Testing
         capacitySnapshot(updatedAt: now, health: .error, bars: validBars),
         capacitySnapshot(updatedAt: now, isFallback: true, bars: validBars),
         capacitySnapshot(
-            updatedAt: now.addingTimeInterval(-CapacityInsightService.maximumSnapshotAge - 1),
+            updatedAt: now.addingTimeInterval(-QuotaProjectionService.maximumSnapshotAge - 1),
             bars: validBars
         ),
         capacitySnapshot(updatedAt: now, accountValue: nil, bars: validBars),
@@ -76,13 +76,13 @@ import Testing
     ]
 
     for rejectedSnapshot in rejectedSnapshots {
-        _ = await service.refreshInsights(from: [rejectedSnapshot], now: now)
+        _ = await service.refreshProjections(from: [rejectedSnapshot], now: now)
     }
 
     #expect(try await observationStore.load(now: now).isEmpty)
 }
 
-@Test func capacityInsightFailsClosedWithoutLoadingHistoryWhenCurrentQuotaFails() async throws {
+@Test func quotaProjectionFailsClosedWithoutLoadingHistoryWhenCurrentQuotaFails() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let historicalObservation = QuotaObservation(
         providerID: "codex",
@@ -93,7 +93,7 @@ import Testing
         resetAt: now.addingTimeInterval(3_600)
     )
     let observationStore = CapacityTestObservationStore(observations: [historicalObservation])
-    let service = CapacityInsightService(
+    let service = QuotaProjectionService(
         observationStore: observationStore,
         secretStore: CapacityTestSecretStore()
     )
@@ -109,16 +109,16 @@ import Testing
         ]
     )
 
-    let insights = await service.refreshInsights(from: [failedSnapshot], now: now)
+    let projections = await service.refreshProjections(from: [failedSnapshot], now: now)
 
-    #expect(insights["codex"]?.weather == .fog)
-    #expect(insights["codex"]?.availabilityReason == .currentQuotaUnavailable)
+    #expect(projections["codex"]?.confidence == .unavailable)
+    #expect(projections["codex"]?.availabilityReason == .currentQuotaUnavailable)
     #expect(await observationStore.loadCallCount() == 0)
 }
 
-@Test func capacityInsightExplainsMissingResetAndHistoryFailures() async {
+@Test func quotaProjectionExplainsMissingResetAndHistoryFailures() async {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
-    let missingResetService = CapacityInsightService(
+    let missingResetService = QuotaProjectionService(
         observationStore: CapacityTestObservationStore(),
         secretStore: CapacityTestSecretStore()
     )
@@ -133,15 +133,15 @@ import Testing
         ]
     )
 
-    let missingResetInsights = await missingResetService.refreshInsights(
+    let missingResetProjections = await missingResetService.refreshProjections(
         from: [missingReset],
         now: now
     )
 
-    #expect(missingResetInsights["codex"]?.weather == .fog)
-    #expect(missingResetInsights["codex"]?.availabilityReason == .resetUnavailable)
+    #expect(missingResetProjections["codex"]?.confidence == .unavailable)
+    #expect(missingResetProjections["codex"]?.availabilityReason == .resetUnavailable)
 
-    let failingHistoryService = CapacityInsightService(
+    let failingHistoryService = QuotaProjectionService(
         observationStore: CapacityTestObservationStore(shouldFailLoading: true),
         secretStore: CapacityTestSecretStore()
     )
@@ -156,25 +156,25 @@ import Testing
         ]
     )
 
-    let failingHistoryInsights = await failingHistoryService.refreshInsights(
+    let failingHistoryProjections = await failingHistoryService.refreshProjections(
         from: [currentSnapshot],
         now: now
     )
 
-    #expect(failingHistoryInsights["codex"]?.weather == .fog)
-    #expect(failingHistoryInsights["codex"]?.availabilityReason == .historyUnavailable)
+    #expect(failingHistoryProjections["codex"]?.confidence == .unavailable)
+    #expect(failingHistoryProjections["codex"]?.availabilityReason == .historyUnavailable)
 }
 
-@Test func capacityInsightScopeIsStablePerInstallationAndSeparatesAccounts() async throws {
+@Test func quotaProjectionScopeIsStablePerInstallationAndSeparatesAccounts() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let secretStore = CapacityTestSecretStore()
     let firstStore = CapacityTestObservationStore()
     let secondStore = CapacityTestObservationStore()
-    let firstService = CapacityInsightService(
+    let firstService = QuotaProjectionService(
         observationStore: firstStore,
         secretStore: secretStore
     )
-    let secondService = CapacityInsightService(
+    let secondService = QuotaProjectionService(
         observationStore: secondStore,
         secretStore: secretStore
     )
@@ -186,15 +186,15 @@ import Testing
         )
     ]
 
-    _ = await firstService.refreshInsights(
+    _ = await firstService.refreshProjections(
         from: [capacitySnapshot(updatedAt: now, accountValue: "person@example.com", bars: bars)],
         now: now
     )
-    _ = await secondService.refreshInsights(
+    _ = await secondService.refreshProjections(
         from: [capacitySnapshot(updatedAt: now, accountValue: "PERSON@example.com", bars: bars)],
         now: now
     )
-    _ = await secondService.refreshInsights(
+    _ = await secondService.refreshProjections(
         from: [capacitySnapshot(updatedAt: now, accountValue: "other@example.com", bars: bars)],
         now: now
     )

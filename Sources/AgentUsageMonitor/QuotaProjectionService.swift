@@ -2,14 +2,14 @@ import AgentUsageCore
 import CryptoKit
 import Foundation
 
-protocol CapacityInsightProviding: Sendable {
-    func refreshInsights(
+protocol QuotaProjectionProviding: Sendable {
+    func refreshProjections(
         from snapshots: [ProviderSnapshot],
         now: Date
-    ) async -> [String: CapacityInsight]
+    ) async -> [String: QuotaProjection]
 }
 
-actor CapacityInsightService: CapacityInsightProviding {
+actor QuotaProjectionService: QuotaProjectionProviding {
     static let maximumSnapshotAge: TimeInterval = 5 * 60
     static let futureDateTolerance: TimeInterval = 5 * 60
 
@@ -25,10 +25,10 @@ actor CapacityInsightService: CapacityInsightProviding {
         self.secretStore = secretStore
     }
 
-    func refreshInsights(
+    func refreshProjections(
         from snapshots: [ProviderSnapshot],
         now: Date = Date()
-    ) async -> [String: CapacityInsight] {
+    ) async -> [String: QuotaProjection] {
         guard let snapshot = snapshots.first(where: { $0.id == "codex" }) else {
             return [:]
         }
@@ -50,7 +50,7 @@ actor CapacityInsightService: CapacityInsightProviding {
                 now: now
             )
             guard current.isEmpty == false else {
-                let reason: HeadroomAvailabilityReason = Self.hasOfficialRemainingQuota(snapshot)
+                let reason: QuotaProjectionAvailabilityReason = Self.hasOfficialRemainingQuota(snapshot)
                     ? .resetUnavailable
                     : .currentQuotaUnavailable
                 return unavailable(reason, now: now)
@@ -58,16 +58,16 @@ actor CapacityInsightService: CapacityInsightProviding {
 
             try await observationStore.record(current, now: now)
             let history = try await observationStore.load(now: now)
-            guard let insight = HeadroomAnalyzer.analyze(
+            guard let projection = QuotaProjectionAnalyzer.analyze(
                 current: current,
                 history: history,
                 now: now
             ) else {
                 return unavailable(.insufficientHistory, now: now)
             }
-            return [snapshot.id: insight]
+            return [snapshot.id: projection]
         } catch {
-            // History and forecasts are optional and must never affect current provider health.
+            // History and projections are optional and must never affect current provider health.
             return unavailable(.historyUnavailable, now: now)
         }
     }
@@ -75,7 +75,7 @@ actor CapacityInsightService: CapacityInsightProviding {
     nonisolated static func currentUnavailabilityReason(
         for snapshot: ProviderSnapshot,
         now: Date
-    ) -> HeadroomAvailabilityReason? {
+    ) -> QuotaProjectionAvailabilityReason? {
         guard snapshot.kind == .subscription,
               snapshot.health == .ready,
               snapshot.sourceDiagnostics?.contains(where: { diagnostic in
@@ -140,11 +140,11 @@ actor CapacityInsightService: CapacityInsightProviding {
     }
 
     private func unavailable(
-        _ reason: HeadroomAvailabilityReason,
+        _ reason: QuotaProjectionAvailabilityReason,
         now: Date
-    ) -> [String: CapacityInsight] {
+    ) -> [String: QuotaProjection] {
         [
-            "codex": CapacityInsight.unavailable(
+            "codex": QuotaProjection.unavailable(
                 providerID: "codex",
                 reason: reason,
                 generatedAt: now
@@ -184,7 +184,7 @@ actor CapacityInsightService: CapacityInsightProviding {
 
         if let encodedKey = try secretStore.read(account: KeychainAccount.quotaHistoryScopeKey) {
             guard let data = Data(base64Encoded: encodedKey), data.count == 32 else {
-                throw CapacityInsightError.invalidScopeKey
+                throw QuotaProjectionServiceError.invalidScopeKey
             }
             let key = SymmetricKey(data: data)
             cachedScopeKey = key
@@ -202,6 +202,6 @@ actor CapacityInsightService: CapacityInsightProviding {
     }
 }
 
-private enum CapacityInsightError: Error {
+private enum QuotaProjectionServiceError: Error {
     case invalidScopeKey
 }
