@@ -6,6 +6,19 @@ final class BrandLogoStore {
 
     private var cache: [String: NSImage] = [:]
     private let fileExtensions = ["png", "svg", "ico"]
+    private lazy var resourceBundle: Bundle = {
+        let bundleName = "AgentUsageMonitor_AgentUsageMonitor.bundle"
+
+        if let resourcesURL = Bundle.main.resourceURL,
+           let packagedBundle = Bundle(
+               url: resourcesURL.appendingPathComponent(bundleName, isDirectory: true)
+           ) {
+            return packagedBundle
+        }
+
+        // SwiftPM keeps resources beside the executable during local development.
+        return Bundle.module
+    }()
 
     func preload(_ names: [String]) {
         for name in names {
@@ -34,7 +47,7 @@ final class BrandLogoStore {
     }
 
     private func loadImage(name: String, fileExtension: String, subdirectory: String?) -> NSImage? {
-        guard let url = Bundle.module.url(
+        guard let url = resourceBundle.url(
             forResource: name,
             withExtension: fileExtension,
             subdirectory: subdirectory

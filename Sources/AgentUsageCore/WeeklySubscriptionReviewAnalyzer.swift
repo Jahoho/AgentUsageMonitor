@@ -69,17 +69,29 @@ public enum WeeklySubscriptionReviewAnalyzer {
     public static let weeklyQuotaID = "codex-weekly"
     public static let nominalWeeklyDuration: TimeInterval = 7 * 24 * 60 * 60
     public static let expectedSampleInterval: TimeInterval = 5 * 60
-    public static let minimumCoverageDuration: TimeInterval = 30 * 60
-    public static let maximumComparisonProgressDifference: TimeInterval = 2 * 60 * 60
+    public static let maximumCycleStartOffset: TimeInterval = 12 * 60 * 60
+    public static let maximumCycleEndLead: TimeInterval = 6 * 60 * 60
+    public static let minimumSampleCoverageFraction = 0.15
+    public static let maximumRhythmGap: TimeInterval = 4 * 60 * 60
+    public static let minimumRhythmAttributionFraction = 0.5
+    public static let minimumMeaningfulCycleUse = 0.02
+    public static let meaningfulDayUseThreshold = 0.005
+    public static let lowHeadroomThreshold = 0.05
+    public static let ampleHeadroomThreshold = 0.35
 
-    private static let cycleStartLeadThreshold: TimeInterval = 6 * 24 * 60 * 60
+    private static let minimumStartRemainingFraction = 0.98
     private static let capacityIncreaseThreshold = 0.02
     private static let resetBoundaryTolerance: TimeInterval = 5 * 60
+    private static let minimumBaselineCycleCount = 3
+    private static let minimumPlanFitCycleCount = 3
+    private static let maximumBaselineCycleCount = 4
+    private static let maximumPlanFitCycleCount = 4
 
     public static func analyze(
         current: [QuotaObservation],
         history: [QuotaObservation],
-        now: Date
+        now: Date,
+        calendar: Calendar = .current
     ) -> WeeklySubscriptionReview? {
         let normalizedCurrent = CodexQuotaObservationNormalizer.normalize(current)
         guard let currentWeekly = normalizedCurrent
@@ -100,28 +112,53 @@ public enum WeeklySubscriptionReviewAnalyzer {
                 }
         )
         let cycles = cycleSegments(from: points)
-        guard let currentCycle = cycles.last,
-              let currentSummary = summary(for: currentCycle)
-        else {
+        guard cycles.isEmpty == false else {
+            return nil
+        }
+
+        // A capacity correction can split observations before the advertised reset.
+        // Only a segment whose own reset has actually passed is a completed cycle.
+        let completedCycles = cycles.dropLast().filter { cycle in
+            guard let resetAt = cycle.last?.resetAt else {
+                return false
+            }
+            return resetAt <= now.addingTimeInterval(resetBoundaryTolerance)
+        }
+        guard let latestCompletedPoints = completedCycles.last else {
             return .unavailable(
                 providerID: currentWeekly.providerID,
-                reason: .insufficientCurrentCycle,
-                generatedAt: now
+                reason: .noCompletedCycle,
+                generatedAt: now,
+                currentResetAt: currentWeekly.resetAt
+            )
+        }
+        guard let latestCompleted = completedCycleSummary(
+            for: latestCompletedPoints,
+            calendar: calendar
+        ) else {
+            return .unavailable(
+                providerID: currentWeekly.providerID,
+                reason: .insufficientCompletedCycleCoverage,
+                generatedAt: now,
+                currentResetAt: currentWeekly.resetAt
             )
         }
 
-        let previousCycle = cycles.dropLast().last
-        let comparisonResult = comparison(
-            currentCycle: currentCycle,
-            currentSummary: currentSummary,
-            previousCycle: previousCycle
-        )
+        let previousCompleted = completedCycles.dropLast().compactMap { cycle in
+            completedCycleSummary(for: cycle, calendar: calendar)
+        }
+        let eligibleCompletedCycles = previousCompleted + [latestCompleted]
 
         return WeeklySubscriptionReview(
             providerID: currentWeekly.providerID,
-            currentCycle: currentSummary,
-            comparison: comparisonResult.comparison,
-            comparisonAvailabilityReason: comparisonResult.reason,
+            currentResetAt: currentWeekly.resetAt,
+            completedCycle: latestCompleted,
+            baselineComparison: baselineComparison(
+                completedCycle: latestCompleted,
+                previousCycles: previousCompleted
+            ),
+            planFit: planFit(for: eligibleCompletedCycles),
+            eligibleCompletedCycleCount: eligibleCompletedCycles.count,
             generatedAt: now
         )
     }
@@ -167,9 +204,10 @@ public enum WeeklySubscriptionReviewAnalyzer {
             > nominalWeeklyDuration + resetBoundaryTolerance
     }
 
-    private static func summary(
-        for points: [QuotaObservation]
-    ) -> WeeklySubscriptionCycleSummary? {
+    private static func completedCycleSummary(
+        for points: [QuotaObservation],
+        calendar: Calendar
+    ) -> WeeklySubscriptionCompletedCycleSummary? {
         guard let first = points.first,
               let last = points.last,
               points.count >= 2
@@ -177,84 +215,173 @@ public enum WeeklySubscriptionReviewAnalyzer {
             return nil
         }
 
-        let coverageDuration = last.capturedAt.timeIntervalSince(first.capturedAt)
-        guard coverageDuration >= minimumCoverageDuration else {
+        let resetAt = last.resetAt
+        let startedAt = resetAt.addingTimeInterval(-nominalWeeklyDuration)
+        let startOffset = first.capturedAt.timeIntervalSince(startedAt)
+        let endLead = resetAt.timeIntervalSince(last.capturedAt)
+        let expectedSamples = Int(floor(nominalWeeklyDuration / expectedSampleInterval)) + 1
+        let sampleCoverage = min(1, Double(points.count) / Double(expectedSamples))
+
+        guard first.remainingFraction >= minimumStartRemainingFraction,
+              abs(startOffset) <= maximumCycleStartOffset,
+              endLead >= 0,
+              endLead <= maximumCycleEndLead,
+              sampleCoverage >= minimumSampleCoverageFraction
+        else {
             return nil
         }
 
-        let maximumResetLead = points.map { point in
-            point.resetAt.timeIntervalSince(point.capturedAt)
-        }.max() ?? 0
-        let startsNearCycleBeginning = first.remainingFraction >= 0.98
-            && maximumResetLead >= cycleStartLeadThreshold
-        let usageScope: WeeklySubscriptionUsageScope = startsNearCycleBeginning
-            ? .cycleToDate
-            : .observedSpan
-        let expectedSamples = max(1, Int(floor(coverageDuration / expectedSampleInterval)) + 1)
-        let sampleCoverage = min(1, Double(points.count) / Double(expectedSamples))
-        let normalizedRemaining = points.reduce(first.remainingFraction) { remaining, point in
+        let lowestRemaining = points.reduce(first.remainingFraction) { remaining, point in
             min(remaining, point.remainingFraction)
         }
+        let observedUsed = max(0, first.remainingFraction - lowestRemaining)
 
-        return WeeklySubscriptionCycleSummary(
+        return WeeklySubscriptionCompletedCycleSummary(
             quotaID: weeklyQuotaID,
-            resetAt: last.resetAt,
-            currentRemainingFraction: last.remainingFraction,
-            observedUsedFraction: max(0, first.remainingFraction - normalizedRemaining),
+            startedAt: startedAt,
+            resetAt: resetAt,
+            endingRemainingFraction: last.remainingFraction,
+            lowestRemainingFraction: lowestRemaining,
+            observedUsedFraction: observedUsed,
             sampleCount: points.count,
-            coverageDuration: coverageDuration,
-            cycleCoverageFraction: startsNearCycleBeginning
-                ? min(1, coverageDuration / nominalWeeklyDuration)
-                : nil,
             sampleCoverageFraction: sampleCoverage,
-            usageScope: usageScope
+            endObservationLead: endLead,
+            rhythm: rhythmSummary(
+                for: points,
+                totalObservedUse: observedUsed,
+                calendar: calendar
+            )
         )
     }
 
-    private static func comparison(
-        currentCycle: [QuotaObservation],
-        currentSummary: WeeklySubscriptionCycleSummary,
-        previousCycle: [QuotaObservation]?
-    ) -> (
-        comparison: WeeklySubscriptionComparison?,
-        reason: WeeklySubscriptionComparisonAvailabilityReason?
-    ) {
-        guard let previousCycle else {
-            return (nil, .noPreviousCycle)
-        }
-        guard currentSummary.usageScope == .cycleToDate,
-              let previousSummary = summary(for: previousCycle),
-              previousSummary.usageScope == .cycleToDate,
-              let currentFirst = currentCycle.first,
-              let currentLast = currentCycle.last,
-              let previousFirst = previousCycle.first
-        else {
-            return (nil, .insufficientPreviousCoverage)
+    private static func rhythmSummary(
+        for points: [QuotaObservation],
+        totalObservedUse: Double,
+        calendar: Calendar
+    ) -> WeeklySubscriptionRhythmSummary? {
+        if totalObservedUse < minimumMeaningfulCycleUse {
+            return WeeklySubscriptionRhythmSummary(
+                pattern: .quiet,
+                activeDayCount: 0,
+                peakWeekday: nil,
+                topTwoDayUseFraction: 0,
+                attributedUseFraction: 1
+            )
         }
 
-        let currentProgress = currentLast.capturedAt.timeIntervalSince(currentFirst.capturedAt)
-        let targetDate = previousFirst.capturedAt.addingTimeInterval(currentProgress)
-        guard let match = previousCycle.min(by: {
-            abs($0.capturedAt.timeIntervalSince(targetDate))
-                < abs($1.capturedAt.timeIntervalSince(targetDate))
-        }) else {
-            return (nil, .noComparablePoint)
+        guard let first = points.first else {
+            return nil
+        }
+        var previousPoint = first
+        var previousRemaining = first.remainingFraction
+        var useByDay: [Date: Double] = [:]
+        var attributedUse = 0.0
+
+        for point in points.dropFirst() {
+            let normalizedRemaining = min(previousRemaining, point.remainingFraction)
+            let observedDrop = max(0, previousRemaining - normalizedRemaining)
+            let interval = point.capturedAt.timeIntervalSince(previousPoint.capturedAt)
+
+            if observedDrop > 0, interval > 0, interval <= maximumRhythmGap {
+                let midpoint = previousPoint.capturedAt.addingTimeInterval(interval / 2)
+                let day = calendar.startOfDay(for: midpoint)
+                useByDay[day, default: 0] += observedDrop
+                attributedUse += observedDrop
+            }
+
+            previousPoint = point
+            previousRemaining = normalizedRemaining
         }
 
-        let progressDifference = abs(match.capturedAt.timeIntervalSince(targetDate))
-        guard progressDifference <= maximumComparisonProgressDifference else {
-            return (nil, .noComparablePoint)
+        let attributedFraction = min(1, attributedUse / totalObservedUse)
+        guard attributedFraction >= minimumRhythmAttributionFraction else {
+            return nil
         }
 
-        return (
-            WeeklySubscriptionComparison(
-                remainingDifferenceFraction: currentSummary.currentRemainingFraction
-                    - match.remainingFraction,
-                previousRemainingFraction: match.remainingFraction,
-                matchedProgressDifference: progressDifference
-            ),
-            nil
+        let meaningfulDays = useByDay.filter { $0.value >= meaningfulDayUseThreshold }
+        guard let peakDay = meaningfulDays.max(by: { $0.value < $1.value })?.key else {
+            return nil
+        }
+
+        let rankedDayUse = useByDay.values.sorted(by: >)
+        let topTwoUse = rankedDayUse.prefix(2).reduce(0, +)
+        let topTwoFraction = attributedUse > 0 ? min(1, topTwoUse / attributedUse) : 0
+        let activeDayCount = meaningfulDays.count
+
+        let pattern: WeeklySubscriptionRhythmPattern
+        if activeDayCount <= 2 || topTwoFraction >= 0.7 {
+            pattern = .concentrated
+        } else if activeDayCount >= 5 && topTwoFraction <= 0.5 {
+            pattern = .steady
+        } else {
+            pattern = .mixed
+        }
+
+        return WeeklySubscriptionRhythmSummary(
+            pattern: pattern,
+            activeDayCount: activeDayCount,
+            peakWeekday: calendar.component(.weekday, from: peakDay),
+            topTwoDayUseFraction: topTwoFraction,
+            attributedUseFraction: attributedFraction
         )
+    }
+
+    private static func baselineComparison(
+        completedCycle: WeeklySubscriptionCompletedCycleSummary,
+        previousCycles: [WeeklySubscriptionCompletedCycleSummary]
+    ) -> WeeklySubscriptionBaselineComparison? {
+        let comparisonCycles = Array(previousCycles.suffix(maximumBaselineCycleCount))
+        guard comparisonCycles.count >= minimumBaselineCycleCount else {
+            return nil
+        }
+
+        let medianUsed = median(comparisonCycles.map(\.observedUsedFraction))
+        return WeeklySubscriptionBaselineComparison(
+            usedDifferenceFraction: completedCycle.observedUsedFraction - medianUsed,
+            medianUsedFraction: medianUsed,
+            comparisonCycleCount: comparisonCycles.count
+        )
+    }
+
+    private static func planFit(
+        for completedCycles: [WeeklySubscriptionCompletedCycleSummary]
+    ) -> WeeklySubscriptionPlanFitSummary? {
+        let evaluated = Array(completedCycles.suffix(maximumPlanFitCycleCount))
+        guard evaluated.count >= minimumPlanFitCycleCount else {
+            return nil
+        }
+
+        let ampleCount = evaluated.filter {
+            $0.endingRemainingFraction >= ampleHeadroomThreshold
+        }.count
+        let nearLimitCount = evaluated.filter {
+            $0.lowestRemainingFraction <= lowHeadroomThreshold
+        }.count
+
+        let pattern: WeeklySubscriptionPlanFitPattern
+        if ampleCount >= 3 {
+            pattern = .ampleHeadroom
+        } else if nearLimitCount >= 2 {
+            pattern = .frequentPressure
+        } else {
+            pattern = .mixed
+        }
+
+        return WeeklySubscriptionPlanFitSummary(
+            pattern: pattern,
+            evaluatedCycleCount: evaluated.count,
+            ampleHeadroomCycleCount: ampleCount,
+            nearLimitCycleCount: nearLimitCount
+        )
+    }
+
+    private static func median(_ values: [Double]) -> Double {
+        let sorted = values.sorted()
+        let middle = sorted.count / 2
+        if sorted.count.isMultiple(of: 2) {
+            return (sorted[middle - 1] + sorted[middle]) / 2
+        }
+        return sorted[middle]
     }
 
     private static func deduplicated(

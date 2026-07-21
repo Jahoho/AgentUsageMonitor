@@ -8,7 +8,8 @@ Notable user-visible changes are documented here. The project follows semantic v
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
 - A compact Estimated quota projection on the eligible Codex subscription detail page, showing a remaining-at-reset range or possible exhaustion, tolerating normal long-window sampling gaps, and suppressing genuinely sparse or unstable forecasts. Overview and direct-billed API providers do not show projection cards.
-- An expandable Observed weekly subscription review in Overview, showing current-cycle use, honest history coverage, and a same-point previous-cycle comparison when comparable history exists.
+- An expandable Observed weekly subscription recap in Overview, summarizing the latest trustworthy completed cycle with its outcome, usage rhythm, personal baseline, recent plan-fit pattern, and explicit data quality.
+- Local packages now seal the completed app bundle with an ad-hoc signature and verify its integrity before installation, preventing immediate Gatekeeper termination caused by unsealed resources.
 
 ### Planned
 

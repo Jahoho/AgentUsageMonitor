@@ -59,9 +59,10 @@
 - Multiple windows select the lowest projected lower bound, and outcomes distinguish remaining at reset, possible exhaustion and likely exhaustion.
 - Quota projection fails closed without loading history when current Official quota fails, and explains missing reset timing or history storage separately.
 - Codex window identity prefers official duration, so a weekly-only primary window maps to `codex-weekly`; legacy long-primary observations normalize in memory without rewriting true five-hour session history.
-- Weekly review segments cycles on material capacity refill rather than reset-time jitter, requires at least 30 minutes of current-cycle history, and distinguishes full cycle-to-date coverage from a partial observed span.
-- Weekly review reports five-minute sample coverage and compares the previous cycle only at a matching progress point within two hours; missing or partial previous coverage remains explicit.
-- Weekly review fails closed with current Official quota/account failures and cannot populate quota bars or provider health.
+- Weekly recap segments cycles on material capacity refill rather than reset-time jitter, rejects pre-reset capacity corrections as completed weeks, and waits for an actual completed cycle instead of repeating current quota.
+- Weekly recap requires near-start and near-reset observations plus at least 15% five-minute sample coverage. Rhythm ignores changes across gaps above four hours and requires at least half of observed use to be attributable.
+- Weekly recap personal baseline uses at least three earlier trustworthy cycles; descriptive plan fit uses three to four recent cycles and distinguishes ample headroom, repeated low headroom and mixed outcomes without recommending a plan change.
+- Weekly recap fails closed with current Official quota/account failures and cannot populate quota bars or provider health.
 - Codex OAuth/RPC rate limit snapshots map into official provider bars.
 - Codex adapter returns an error when OAuth/RPC sources exceed the adapter-level official sync timeout.
 - Codex adapter retries a transient official transport failure once inside the same bounded refresh, has enough default budget for two complete source attempts, and records when that retry recovered current official data.
@@ -122,13 +123,14 @@
 - Confirm GitHub Actions runs the release gate on both `macos-15` and `macos-15-intel`.
 - Run `./scripts/package-app.sh`.
 - Run `./scripts/verify-package.sh`.
-- Confirm package verification checks `CFBundleIdentifier`, executable name, package type, minimum macOS version, and `LSUIElement` in addition to files/resources.
+- Confirm package verification checks `CFBundleIdentifier`, executable name, package type, minimum macOS version, `LSUIElement`, and the completed bundle's ad-hoc signature in addition to files/resources.
 - Confirm a sentinel file placed only in the previous Release bundle is absent after packaging, proving stale resources cannot survive a rebuild.
-- Confirm the packaged app contains `AgentUsageMonitor_AgentUsageMonitor.bundle`.
+- Confirm the packaged app contains `Contents/Resources/AgentUsageMonitor_AgentUsageMonitor.bundle` and no resource bundle at the app root.
 - Confirm the packaged app contains `Contents/Resources/AgentUsageMonitor.icns`.
 - Confirm `codex.png`, `claude.png`, `deepseek.png`, and `openrouter.svg` exist inside the packaged resource bundle.
 - Quit the running app, run `./scripts/install-app.sh`, then run `./scripts/verify-installation.sh`.
 - Confirm install verification reports byte-identical Release and installed bundles with no historical, staging, or previous app bundle left behind.
+- Confirm a package built from a Desktop/FileProvider-backed checkout still passes strict `codesign` verification after reaching the final Release and `/Applications` paths.
 
 ## Manual
 
@@ -181,8 +183,9 @@
 - With insufficient same-cycle history, confirm the Codex page says that more history is being collected and labels the projection `Unavailable` rather than guessing a pace.
 - With sufficient history, confirm the card shows a remaining-at-reset range or a concise exhaustion warning, recent Official coverage, and an `Estimated` label. A wide but uniformly exhausted long-window range must omit the specific exhaustion time.
 - Temporarily make the current Codex official refresh fail after an Estimated projection exists and confirm the card immediately becomes `Unavailable` while the old projection is not displayed as current.
-- Confirm Overview shows one compact `Weekly review` card while the Codex detail page does not duplicate it. Click the card and confirm cycle coverage, sampling coverage and previous-cycle detail expand in place.
-- With only the current weekly cycle recorded, confirm the card shows Observed use and says that a fair previous-cycle comparison is still being collected. With comparable prior history, confirm it compares remaining quota at the same cycle progress rather than total values from unequal spans.
+- Confirm Overview shows one compact `Weekly recap` card while the Codex detail page does not duplicate it. Click the card and confirm Rhythm, Capacity, Compared, Plan fit and Data quality expand in place.
+- With only the current weekly cycle recorded, confirm the card waits for a fully observed reset instead of repeating current used percentage. After one trustworthy completed cycle, confirm outcome and rhythm appear; after three earlier cycles, confirm the personal median comparison appears.
+- Across three to four trustworthy completed cycles, confirm the Plan fit row describes repeated ample or low headroom without suggesting an upgrade or downgrade.
 - Cold-launch the installed app and leave it running across an official refresh; confirm an app-server stdin closure cannot terminate the menu bar process.
 - Confirm Codex activity reflects local session logs when `~/.codex/sessions` has token events.
 - Confirm Codex `Today local tokens`, `30d local tokens`, `Latest local tokens`, `Top local model`, and hourly activity use reported `total_tokens`; each token card shows one total and a cached-input percentage, with no local USD or credit estimate.

@@ -200,7 +200,7 @@ actor QuotaProjectionService: QuotaProjectionProviding {
         case .historyUnavailable:
             return .historyUnavailable
         case .insufficientHistory, .sparseHistory, .unstableTrend:
-            return .insufficientCurrentCycle
+            return .noCompletedCycle
         }
     }
 
