@@ -210,6 +210,6 @@
 ## Not Yet Covered
 
 - Stable Claude subscription reader.
-- Packaged `.app` signing and notarization.
+- Developer ID signing and notarization for public binary distribution.
 - Automated tests for `SMAppService` login item registration; this currently requires packaged-app/manual verification.
 - Guarded live-contract tests against opt-in provider test accounts; normal CI uses synthetic fixtures and local loopback only.

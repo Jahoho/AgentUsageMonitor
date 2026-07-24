@@ -7,14 +7,20 @@ Notable user-visible changes are documented here. The project follows semantic v
 ### Added
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
-- A compact Estimated quota projection on the eligible Codex subscription detail page, showing a remaining-at-reset range or possible exhaustion, tolerating normal long-window sampling gaps, and suppressing genuinely sparse or unstable forecasts. Overview and direct-billed API providers do not show projection cards.
+- A compact Estimated quota projection showing a remaining-at-reset range or possible exhaustion while suppressing sparse or unstable forecasts.
 - An expandable Observed weekly subscription recap in Overview, summarizing the latest trustworthy completed cycle with its outcome, usage rhythm, personal baseline, recent plan-fit pattern, and explicit data quality.
-- Local packages now seal the completed app bundle with an ad-hoc signature and verify its integrity before installation, preventing immediate Gatekeeper termination caused by unsealed resources.
 
-### Planned
+### Changed
 
-- Signed and notarized macOS distribution.
-- Additional providers only when a stable official or explicitly observed usage source is available.
+- Quota projection is limited to eligible subscription Coding Plan detail pages. Overview and directly billed API-key providers do not render it.
+- Weekly review now recaps the latest completed cycle instead of repeating the current used percentage.
+- Long-window projection keeps broad elapsed-time history across normal sampling gaps while preventing cross-gap changes from becoming a false recent pace.
+
+### Fixed
+
+- The full visible navigation tab, including the center of outlined icons, is now clickable.
+- Pre-reset capacity and reset-time corrections no longer create a fake completed weekly recap.
+- Local packages now use a standard resource layout, seal the complete app bundle with an ad-hoc signature, and verify the installed bundle before removing the rollback copy.
 
 ## [0.1.0] - 2026-07-16
 

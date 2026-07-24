@@ -2,7 +2,7 @@
 
 ## Current Release Model
 
-The `0.1.x` line is source-first. Users build locally from a tagged GitHub source release or a Git clone. The project does not yet publish a signed and notarized `.app` as a trusted binary download.
+The current public release model is source-first. Users build locally from a tagged GitHub source release or a Git clone. The project does not yet publish a Developer ID-signed and notarized `.app` as a trusted binary download.
 
 Requirements:
 

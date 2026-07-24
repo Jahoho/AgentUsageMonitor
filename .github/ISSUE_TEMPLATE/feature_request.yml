@@ -3,10 +3,19 @@ description: Propose a focused improvement or a provider with a reliable data so
 title: "[Feature]: "
 body:
   - type: textarea
+    id: scenario
+    attributes:
+      label: Usage scenario
+      description: When does this matter, what are you trying to decide, and what do you do today instead?
+      placeholder: When I am about to start a long coding session, I need to...
+    validations:
+      required: true
+
+  - type: textarea
     id: problem
     attributes:
       label: Problem
-      description: What workflow or decision is difficult today?
+      description: What is unreliable, slow, confusing, or impossible in that workflow?
     validations:
       required: true
 
@@ -17,6 +26,12 @@ body:
       description: Describe the smallest useful behavior, not only a preferred implementation.
     validations:
       required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: What would you be able to understand or do when the improvement works?
 
   - type: textarea
     id: source
@@ -33,4 +48,5 @@ body:
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives considered
+      label: Tradeoffs and alternatives
+      description: What simpler workaround exists, and what should this feature deliberately avoid doing?
