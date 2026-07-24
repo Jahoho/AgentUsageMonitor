@@ -4,6 +4,8 @@ Notable user-visible changes are documented here. The project follows semantic v
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-24
+
 ### Added
 
 - Privacy-scoped local history for eligible current official Codex quota samples.
@@ -21,6 +23,13 @@ Notable user-visible changes are documented here. The project follows semantic v
 - The full visible navigation tab, including the center of outlined icons, is now clickable.
 - Pre-reset capacity and reset-time corrections no longer create a fake completed weekly recap.
 - Local packages now use a standard resource layout, seal the complete app bundle with an ad-hoc signature, and verify the installed bundle before removing the rollback copy.
+
+### Known Limitations
+
+- Public distribution remains source-first; the project does not attach an unsigned or unnotarized app bundle to the release.
+- Quota projection remains unavailable until the current reset cycle has enough stable Official history.
+- Weekly recap remains unavailable until the app has observed a completed weekly cycle with sufficient boundary coverage and sample density.
+- Claude exact subscription quota remains unavailable without a stable machine-readable official source.
 
 ## [0.1.0] - 2026-07-16
 
@@ -48,3 +57,7 @@ Notable user-visible changes are documented here. The project follows semantic v
 - Public binaries are not yet signed or notarized.
 - Claude exact subscription quota remains unavailable.
 - Codex local token activity is observed telemetry and may not equal an official account dashboard.
+
+[Unreleased]: https://github.com/Jahoho/AgentUsageMonitor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Jahoho/AgentUsageMonitor/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Jahoho/AgentUsageMonitor/releases/tag/v0.1.0
