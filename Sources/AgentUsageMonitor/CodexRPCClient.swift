@@ -119,7 +119,7 @@ private final class CodexRPCSession: @unchecked Sendable {
         let responseReader = CodexRPCLineReader(handle: stdoutPipe.fileHandleForReading)
 
         try sendRequest(
-            ["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "AgentUsageMonitor", "version": "0.1.0"]]],
+            ["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "AgentUsageMonitor", "version": "0.2.0"]]],
             to: stdinPipe
         )
         _ = try readResponse(id: 1, from: responseReader)
