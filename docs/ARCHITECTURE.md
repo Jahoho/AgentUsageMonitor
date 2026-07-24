@@ -6,7 +6,7 @@ The app separates provider-neutral usage concepts from macOS-specific integratio
 
 - `AgentUsageCore`: data models, confidence labels, provider snapshots, remaining-quota semantics, scalar quota observations, pure quota projection, DeepSeek response/SSE parsing, aggregation helpers.
 - `AgentUsageMonitor`: menu bar UI, provider adapters, provider orchestration, macOS Keychain, local command checks, official URL opening.
-- `Packaging`: local `.app` bundle metadata for personal review builds. Release and installation scripts build into hidden staging bundles, validate identity/resources before replacement, and retain the previous bundle until the staged replacement passes content verification.
+- `Packaging`: local `.app` bundle metadata for personal review builds. Release and installation scripts build into hidden staging bundles, validate identity, resources, and ad-hoc signature integrity before replacement, and retain the previous bundle until the staged replacement passes verification.
 
 `MenuBarStatusSnapshot` is the canonical compact status model. It chooses the one provider the user most needs to know about using this priority:
 
@@ -253,7 +253,7 @@ The app starts a local DeepSeek proxy after a DeepSeek API key is saved. The pro
 
 The app also runs a background refresh loop for the menu bar status light. The loop uses the same provider loading path as manual refresh, so the menu bar reflects official quota and provider status as soon as the app can read them.
 
-After those current values are published, quota-history capture and quota projection run in an asynchronous post-refresh task. Slow or failed history IO therefore cannot delay provider rendering, change refresh health or extend the provider timeout budget. The result returns only to the separate projection-card state.
+After those current values are published, quota-history capture, quota projection, and weekly recap analysis run in an asynchronous post-refresh task. Slow or failed history IO therefore cannot delay provider rendering, change refresh health or extend the provider timeout budget. Results update only the separate projection and weekly-review state.
 
 DeepSeek credential metadata and local proxy lifecycle are configured at launch and when settings change, not after every provider refresh. This keeps routine dashboard publication free of synchronous Keychain/proxy work on the main actor; provider adapters continue reading required secrets only from their background refresh tasks.
 

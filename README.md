@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  A source-aware macOS menu bar monitor for AI subscription limits, API spend, and observed token activity.
+  Know what is left, what it costs, and which usage numbers you can trust.
 </p>
 
 <p align="center">
@@ -19,9 +19,20 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2ea44f" alt="MIT License"></a>
 </p>
 
-Agent Usage Monitor keeps the usage signals that matter during daily AI-assisted work in one compact native macOS interface. It deliberately separates official provider data from locally observed activity and reports missing data as unavailable instead of filling gaps with guesses.
+AI coding work rarely fits one billing model. A builder can move between a subscription agent, a metered API key, and local coding sessions in the same day, while every provider defines “usage” differently.
 
-The initial public release is source-first. The repository is ready to build and verify locally; signed and notarized binary distribution is planned for a later release.
+Agent Usage Monitor keeps those signals in one compact native macOS interface without pretending they are equivalent. Subscription headroom stays separate from API spend, local activity stays visibly observed, and missing data stays unavailable instead of becoming a confident-looking guess.
+
+The current public distribution is source-first. The repository is ready to build and verify locally; signed and notarized binary distribution remains a separate future milestone.
+
+## The Decisions It Helps With
+
+- **Before a long coding session:** check current Official quota and reset timing, then use a local projection only when enough same-cycle evidence exists.
+- **While switching tools:** see which provider is active and distinguish subscription capacity, API spend, and observed token activity at a glance.
+- **At the end of a weekly cycle:** review whether usage was quiet, concentrated, steady, or repeatedly close to the limit instead of rereading the same percentage.
+- **When a provider source fails:** know that a value is unavailable rather than silently receiving stale quota or invented history.
+
+The goal is not to produce one universal “AI usage score.” It is to support better decisions while preserving the accounting model and trust boundary behind every number.
 
 ## Provider Coverage
 
@@ -109,12 +120,12 @@ Start with the [Documentation Index](docs/README.md), [Architecture](docs/ARCHIT
 - The app is not signed or notarized for third-party binary distribution.
 - Claude does not expose exact subscription quota in the current adapter.
 - Codex local token activity is observed telemetry, not an official account billing total.
-- Codex quota projection needs at least five same-cycle Official samples; short windows require 30 continuous minutes, while long windows require 6 hours of sampled coverage and sufficient density. Normal overnight gaps widen uncertainty instead of invalidating all history.
-- Codex weekly recap appears only after a completed cycle was observed near its start and reset with at least 15% of the expected five-minute samples. Rhythm ignores changes across gaps longer than four hours; personal baseline needs three earlier complete cycles, while plan fit needs three complete cycles and remains descriptive rather than recommending a plan change.
+- Codex quota projection appears only with sufficient same-cycle Official history; sparse or unstable inputs remain unavailable instead of producing a weak forecast.
+- Codex weekly recap requires a trustworthy completed cycle. Personal comparison and descriptive plan fit appear only after enough earlier cycles exist.
 - DeepSeek historical activity includes only requests that pass through this app's proxy.
 - OpenRouter token activity requires a management key and only reflects records returned by the official API.
 
-See the [Roadmap](docs/ROADMAP.md) for the intentionally small next steps.
+The exact coverage and failure rules are documented in [Data Sources](docs/DATA_SOURCES.md). See the [Roadmap](docs/ROADMAP.md) for the intentionally small next steps.
 
 ## License And Trademarks
 

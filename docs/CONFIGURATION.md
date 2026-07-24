@@ -45,7 +45,8 @@ Expected result:
 - Daily, weekly, monthly, and all-time spend come from the official `/api/v1/key` response.
 - A configured key limit and remaining amount appear as an official quota bar.
 - Management keys also show official account credit totals from `/api/v1/credits`.
-- Token totals and activity are not shown because OpenRouter does not expose an enumerable account-wide token history API.
+- Management keys can discover official key names through `/api/v1/keys` and show hash-scoped model activity for completed UTC dates returned by `/api/v1/activity`.
+- Standard keys do not show token activity because they cannot call those management-only endpoints.
 
 Each key stays in macOS Keychain while its label and local id are stored separately in Application Support. If the current official response is missing, invalid, or incomplete, OpenRouter reports an error and does not substitute cached, local, or estimated usage.
 
@@ -55,7 +56,10 @@ Use `Overview` as the live work panel:
 
 - `Active agent` highlights the provider with current-hour activity, then the provider with the most observed activity today.
 - `Today activity` aggregates observed hourly token usage across connected providers, not one provider at a time.
+- `Weekly recap` reviews the latest trustworthy completed Codex weekly cycle. It waits for a fully observed reset instead of repeating the current used percentage.
 - `Sources` keeps provider health visible without showing provider setup details.
+
+Quota projection intentionally stays on an eligible subscription provider page. Overview does not mix a forecast into the cross-provider health surface, and directly billed API-key providers do not receive a subscription-capacity projection.
 
 Use `Settings` for lower-frequency actions:
 
@@ -123,6 +127,10 @@ The app only shows Codex quota when a current reliable official OAuth/API or CLI
 
 Quota bars show remaining percentage, not used percentage.
 
+The compact `Quota projection` card appears on the Codex detail page only after enough same-account, same-window Official history exists in the current reset cycle. It remains `Unavailable` when samples are sparse, unstable, or the current Official refresh fails. A displayed range is always labeled `Estimated` and never replaces the current quota bar.
+
+The `Weekly recap` card appears in Overview after a trustworthy weekly reset has completed. The first recap reports completed-cycle outcome and attributable rhythm. Personal comparison and descriptive plan fit appear only after enough earlier complete cycles exist; the app does not infer an upgrade or downgrade recommendation.
+
 Codex token activity is read from local Codex session logs. The app extracts timestamp and token usage fields only; prompt text is not displayed by the monitor. Token cards show the reported total, including cached input, plus one cached-input percentage. They do not show a local USD or credit estimate.
 
 Important:
@@ -153,9 +161,7 @@ The app only shows exact quota when a reliable official value is readable. Other
 Run:
 
 ```bash
-swift test --no-parallel
-./scripts/package-app.sh
-./scripts/verify-package.sh
+./scripts/release-check.sh
 ```
 
 Then open:
